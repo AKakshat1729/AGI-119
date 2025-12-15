@@ -1,0 +1,10 @@
+websockets
+sounddevice
+textblob
+nltk
+numpy
+flask
+aiohttp
+requests
+chromadb
+librosa
