@@ -1,88 +1,167 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
   <head>
-    <title>AGI Therapist Perception-Memory Integrated</title>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Therapist Chatbot</title>
     <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
       body {
-        font-family: Arial, sans-serif;
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        min-height: 100vh;
         display: flex;
         justify-content: center;
         align-items: center;
-        height: 100vh;
-        margin: 0;
-        background-color: #f0f0f0;
       }
-      .container {
-        text-align: center;
+
+      .chat-container {
+        width: 100%;
+        max-width: 800px;
+        height: 90vh;
         background: white;
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-        max-height: 90vh;
-        overflow-y: auto;
+        border-radius: 20px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
       }
-      button {
-        padding: 10px 20px;
-        font-size: 16px;
-        margin: 10px;
-        cursor: pointer;
-        border: none;
-        border-radius: 5px;
+
+      .chat-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         color: white;
+        padding: 20px;
+        text-align: center;
+        font-size: 1.5rem;
+        font-weight: bold;
       }
-      #start {
-        background-color: #4caf50;
+
+      .chat-messages {
+        flex: 1;
+        padding: 20px;
+        overflow-y: auto;
+        background: #f8f9fa;
       }
-      #start:hover {
-        background-color: #45a049;
+
+      .message {
+        margin-bottom: 20px;
+        padding: 15px 20px;
+        border-radius: 18px;
+        max-width: 70%;
+        word-wrap: break-word;
+        animation: fadeIn 0.3s ease-in;
       }
-      #stop {
-        background-color: #f44336;
-        display: none;
+
+      .message.bot {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        margin-right: auto;
+        border-bottom-left-radius: 5px;
       }
-      #stop:hover {
-        background-color: #da190b;
-      }
-      button:disabled {
-        background-color: #cccccc;
-        cursor: not-allowed;
-      }
-      #timer {
-        margin: 10px;
-        font-size: 18px;
+
+      .message.user {
+        background: #e9ecef;
         color: #333;
+        margin-left: auto;
+        text-align: right;
+        border-bottom-right-radius: 5px;
       }
-      #loading {
+
+      .chat-input-area {
+        padding: 20px;
+        background: white;
+        border-top: 1px solid #e9ecef;
+        display: flex;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .text-input {
+        flex: 1;
+        padding: 12px 20px;
+        border: 2px solid #e9ecef;
+        border-radius: 25px;
+        font-size: 16px;
+        outline: none;
+        transition: border-color 0.3s;
+      }
+
+      .text-input:focus {
+        border-color: #667eea;
+      }
+
+      .send-btn {
+        padding: 12px 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        border-radius: 25px;
+        cursor: pointer;
+        font-size: 16px;
+        transition: transform 0.2s;
+      }
+
+      .send-btn:hover {
+        transform: scale(1.05);
+      }
+
+      .audio-controls {
+        display: flex;
+        gap: 10px;
+      }
+
+      .record-btn {
+        padding: 12px;
+        background: #dc3545;
+        color: white;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        width: 50px;
+        height: 50px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all 0.3s;
+      }
+
+      .record-btn.recording {
+        background: #28a745;
+        animation: pulse 1s infinite;
+      }
+
+      .loading {
         display: none;
-        margin-top: 20px;
+        text-align: center;
+        padding: 20px;
       }
-      #result-section {
-        margin-top: 20px;
-        text-align: left;
-        background: #e9e9e9;
-        padding: 10px;
-        border-radius: 5px;
-        max-width: 600px;
-        max-height: 200px;
-        overflow-y: auto;
-        margin-left: auto;
-        margin-right: auto;
+
+      .spinner {
+        border: 4px solid #f3f3f3;
+        border-top: 4px solid #667eea;
+        border-radius: 50%;
+        width: 40px;
+        height: 40px;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 10px;
       }
-      .memory-section {
-        margin-top: 20px;
-        text-align: left;
-        background: #e9e9e9;
-        padding: 10px;
-        border-radius: 5px;
-        max-width: 600px;
-        max-height: 200px;
-        overflow-y: auto;
-        margin-left: auto;
-        margin-right: auto;
+
+      @keyframes fadeIn {
+        from {
+          opacity: 0;
+          transform: translateY(20px);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0);
+        }
       }
-      .memory-section h3 {
-        margin-top: 0;
-      }
+
       @keyframes spin {
         0% {
           transform: rotate(0deg);
@@ -91,50 +170,163 @@
           transform: rotate(360deg);
         }
       }
+
+      @keyframes pulse {
+        0% {
+          transform: scale(1);
+        }
+        100% {
+          transform: scale(1.1);
+        }
+      }
+
+      .typing-indicator {
+        display: none;
+        padding: 15px 20px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 18px;
+        margin-bottom: 20px;
+        margin-right: auto;
+        max-width: 70%;
+        border-bottom-left-radius: 5px;
+      }
+
+      .typing-dots {
+        display: flex;
+        gap: 4px;
+      }
+
+      .typing-dots span {
+        width: 8px;
+        height: 8px;
+        background: white;
+        border-radius: 50%;
+        animation: typing 1.4s infinite;
+      }
+
+      .typing-dots span:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .typing-dots span:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+
+      @keyframes typing {
+        0%,
+        60%,
+        100% {
+          transform: translateY(0);
+        }
+        30% {
+          transform: translateY(-10px);
+        }
+      }
+
+      @media (max-width: 768px) {
+        .chat-container {
+          height: 100vh;
+          border-radius: 0;
+        }
+
+        .message {
+          max-width: 85%;
+        }
+
+        .chat-input-area {
+          padding: 15px;
+        }
+      }
     </style>
   </head>
   <body>
-    <div class="container">
-      <h1>AGI Therapist Perception-Memory Integrated</h1>
-      <p>
-        Click start to begin recording (max 10 seconds). Click stop to analyze.
-      </p>
-      <button id="start" onclick="startRecording()">Start Recording</button>
-      <button id="stop" onclick="stopRecording()">Stop Recording</button>
-      <div id="timer">Time: 0s</div>
-      <div id="loading">
-        <p>Processing... Please wait.</p>
-        <div
-          style="
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 2s linear infinite;
-            margin: 20px auto;
-          "
-        ></div>
+    <div class="chat-container">
+      <div class="chat-header">🤖 AI Therapist</div>
+      <div class="chat-messages" id="chatMessages">
+        <div class="typing-indicator" id="typingIndicator">
+          <div class="typing-dots">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
       </div>
-      <div id="result-section">
-        <h3>Perception Result</h3>
-        <div id="result"></div>
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Processing your message...</p>
       </div>
-      <div class="memory-section">
-        <h3>Working Memory Logs</h3>
-        <div id="wm-logs"></div>
-      </div>
-      <div class="memory-section">
-        <h3>Long-Term Memory Logs</h3>
-        <div id="ltm-logs"></div>
+      <div class="chat-input-area">
+        <input
+          type="text"
+          class="text-input"
+          id="textInput"
+          placeholder="Type your message here..."
+        />
+        <div class="audio-controls">
+          <button class="record-btn" id="recordBtn" title="Hold to record">
+            🎤
+          </button>
+        </div>
+        <button class="send-btn" id="sendBtn">Send</button>
       </div>
     </div>
+
     <script>
+      const chatMessages = document.getElementById("chatMessages");
+      const textInput = document.getElementById("textInput");
+      const sendBtn = document.getElementById("sendBtn");
+      const recordBtn = document.getElementById("recordBtn");
+      const loading = document.getElementById("loading");
+      const typingIndicator = document.getElementById("typingIndicator");
+
       let mediaRecorder;
       let audioChunks = [];
-      let startTime;
-      let timerInterval;
-      const maxDuration = 10; // seconds
+      let isRecording = false;
+
+      // Initialize conversation
+      startConversation();
+
+      // Send text message
+      sendBtn.addEventListener("click", sendTextMessage);
+      textInput.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          sendTextMessage();
+        }
+      });
+
+      // Audio recording
+      recordBtn.addEventListener("mousedown", startRecording);
+      recordBtn.addEventListener("mouseup", stopRecording);
+      recordBtn.addEventListener("mouseleave", stopRecording);
+
+      async function startConversation() {
+        typingIndicator.style.display = "block";
+        try {
+          const response = await fetch("/start_conversation", {
+            method: "POST",
+            body: new FormData(),
+          });
+          const data = await response.json();
+          addMessage(data.message, "bot");
+        } catch (error) {
+          console.error("Error starting conversation:", error);
+          addMessage(
+            "Hello! I'm your AI therapist. How are you feeling today?",
+            "bot"
+          );
+        } finally {
+          typingIndicator.style.display = "none";
+        }
+      }
+
+      function sendTextMessage() {
+        const text = textInput.value.trim();
+        if (!text) return;
+
+        addMessage(text, "user");
+        textInput.value = "";
+        processMessage({ text });
+      }
 
       async function startRecording() {
         try {
@@ -143,7 +335,6 @@
           });
           mediaRecorder = new MediaRecorder(stream);
           audioChunks = [];
-          startTime = Date.now();
 
           mediaRecorder.ondataavailable = (event) => {
             audioChunks.push(event.data);
@@ -151,72 +342,74 @@
 
           mediaRecorder.onstop = () => {
             stream.getTracks().forEach((track) => track.stop());
-            sendAudio();
+            const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
+            processMessage({ audio: audioBlob });
           };
 
           mediaRecorder.start();
-          document.getElementById("start").style.display = "none";
-          document.getElementById("stop").style.display = "inline-block";
-          document.getElementById("timer").innerText = "Time: 0s";
-
-          // Timer
-          timerInterval = setInterval(() => {
-            const elapsed = Math.floor((Date.now() - startTime) / 1000);
-            document.getElementById("timer").innerText = `Time: ${elapsed}s`;
-            if (elapsed >= maxDuration) {
-              stopRecording();
-            }
-          }, 1000);
-
-          // Auto stop after max duration
-          setTimeout(() => {
-            if (mediaRecorder && mediaRecorder.state === "recording") {
-              stopRecording();
-            }
-          }, maxDuration * 1000);
+          isRecording = true;
+          recordBtn.classList.add("recording");
+          recordBtn.textContent = "🔴";
         } catch (error) {
-          document.getElementById("result").innerText =
-            "Error accessing microphone: " + error.message;
+          console.error("Error accessing microphone:", error);
+          addMessage(
+            "Error accessing microphone. Please check permissions.",
+            "bot"
+          );
         }
       }
 
       function stopRecording() {
-        if (mediaRecorder && mediaRecorder.state === "recording") {
+        if (mediaRecorder && isRecording) {
           mediaRecorder.stop();
-          clearInterval(timerInterval);
-          document.getElementById("stop").style.display = "none";
-          document.getElementById("start").style.display = "inline-block";
+          isRecording = false;
+          recordBtn.classList.remove("recording");
+          recordBtn.textContent = "🎤";
         }
       }
 
-      async function sendAudio() {
-        const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
-        const formData = new FormData();
-        formData.append("audio", audioBlob, "recording.wav");
-
-        const loading = document.getElementById("loading");
-        const result = document.getElementById("result");
-        const wmLogs = document.getElementById("wm-logs");
-        const ltmLogs = document.getElementById("ltm-logs");
-        loading.style.display = "block";
-        result.innerText = "";
-        wmLogs.innerText = "";
-        ltmLogs.innerText = "";
+      async function processMessage(data) {
+        typingIndicator.style.display = "block";
+        chatMessages.scrollTop = chatMessages.scrollHeight;
 
         try {
+          const formData = new FormData();
+
+          if (data.text) {
+            formData.append("text", data.text);
+          } else if (data.audio) {
+            formData.append("audio", data.audio, "recording.wav");
+          }
+
           const response = await fetch("/analyze", {
             method: "POST",
             body: formData,
           });
-          const data = await response.json();
-          result.innerText = JSON.stringify(data.perception, null, 2);
-          wmLogs.innerText = JSON.stringify(data.working_memory, null, 2);
-          ltmLogs.innerText = JSON.stringify(data.long_term_memory, null, 2);
+
+          const result = await response.json();
+
+          if (result.error) {
+            addMessage("Sorry, I encountered an error: " + result.error, "bot");
+          } else {
+            addMessage(result.message, "bot");
+          }
         } catch (error) {
-          result.innerText = "Error: " + error.message;
+          console.error("Error processing message:", error);
+          addMessage(
+            "Sorry, I encountered an error processing your message.",
+            "bot"
+          );
         } finally {
-          loading.style.display = "none";
+          typingIndicator.style.display = "none";
         }
+      }
+
+      function addMessage(text, type) {
+        const messageDiv = document.createElement("div");
+        messageDiv.className = `message ${type}`;
+        messageDiv.textContent = text;
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
       }
     </script>
   </body>
