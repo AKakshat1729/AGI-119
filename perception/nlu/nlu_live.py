@@ -5,6 +5,7 @@ nltk.download("punkt_tab", quiet=True)
 nltk.download("averaged_perceptron_tagger_eng", quiet=True)
 nltk.download("maxent_ne_chunker_tab", quiet=True)
 nltk.download("words", quiet=True)
+nltk.download("stopwords", quiet=True)
 
 def get_entities(text):
     tokens = nltk.word_tokenize(text)
