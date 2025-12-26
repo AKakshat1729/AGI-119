@@ -8,67 +8,104 @@ from perception.nlu.nlu_live import nlu_process
 from memory.working_memory import WorkingMemory
 from memory.long_term_memory import LongTermMemory
 from reasoning.user_life_understanding import UserLifeUnderstanding
+from reasoning.internal_cognition import InternalCognition
+from config import validate_api_keys
 
-# Function to generate therapist-like responses
-def generate_therapist_response(perception_result, insights, tone):
-    # Base responses based on sentiment
-    sentiment_responses = {
-        'positive': [
-            "I'm glad to hear you're feeling positive about this!",
-            "That sounds encouraging. Tell me more about what brings you joy.",
-            "It's wonderful that you're experiencing positive emotions."
-        ],
-        'negative': [
-            "I can sense this is difficult for you right now.",
-            "It sounds like you're going through a challenging time.",
-            "I'm here to listen and support you through this."
-        ],
-        'neutral': [
-            "Thank you for sharing that with me.",
-            "I appreciate you opening up about this.",
-            "Let's explore this together."
+# Validate API keys on startup
+api_errors = validate_api_keys()
+if api_errors:
+    print("❌ API Configuration Errors:")
+    for error in api_errors:
+        print(f"  - {error}")
+    print("\nPlease configure the missing API keys in config.py before running the application.")
+    exit(1)
+
+# Function to generate therapist-like responses using Internal Cognition and Self-Reflection
+def generate_therapist_response(perception_result, insights, tone, user_id="default", transcript=""):
+    try:
+        # Initialize Internal Cognition system
+        cognition = InternalCognition(user_id=user_id)
+
+        # Perform deep semantic understanding
+        understanding_result = cognition.deep_semantic_understanding(transcript, perception_result, tone)
+
+        # Detect uncertainty and potential misunderstandings
+        uncertainty_analysis = cognition.detect_uncertainty_and_misunderstanding(understanding_result)
+
+        # Generate response using internal cognition
+        response_text = cognition.generate_internal_response(
+            understanding_result,
+            insights,
+            tone,
+            uncertainty_analysis
+        )
+
+        # Perform self-reflection on the generated response
+        # (This would typically happen after getting user feedback, but we include it for completeness)
+        reflection = cognition.self_reflect_on_response(
+            response_text,
+            "",  # No immediate feedback available
+            understanding_result
+        )
+
+        # Log the internal cognition process for analysis
+        cognition_log = {
+            'understanding': understanding_result,
+            'uncertainty': uncertainty_analysis,
+            'reflection': reflection,
+            'response': response_text
+        }
+
+        print(f"Internal Cognition Analysis: {json.dumps(cognition_log, indent=2)}")
+
+        return response_text
+
+    except Exception as e:
+        print(f"Unexpected error in generate_therapist_response: {str(e)}")
+        # Fallback to basic response
+        return generate_fallback_response(tone, insights)
+
+# Fallback response generator for when internal cognition fails
+def generate_fallback_response(tone, insights):
+    """Generate a therapeutic response when internal cognition fails."""
+    try:
+        sentiment = tone.get('sentiment', 'neutral') if tone else 'neutral'
+        confidence = tone.get('confidence', 0.5) if tone else 0.5
+
+        # Base response based on sentiment
+        if sentiment == 'negative' and confidence > 0.6:
+            response = "I can sense this is difficult for you right now. It's completely valid to feel this way, and it's brave of you to share it. "
+        elif sentiment == 'positive' and confidence > 0.6:
+            response = "I'm glad to hear you're feeling positive about this. It's important to acknowledge and celebrate these positive feelings. "
+        else:
+            response = "Thank you for sharing that with me. I appreciate you opening up about this. "
+
+        # Add insights from user life understanding if available
+        if insights:
+            if insights.get('past_connections'):
+                response += "I notice this connects to what you've shared before about your experiences. "
+            if insights.get('recurring_problems'):
+                response += "This seems to be something you've been working through. "
+            if insights.get('emotional_progress'):
+                response += "It's good to see how you're growing through these experiences. "
+
+        # Add therapeutic follow-up
+        follow_ups = [
+            "How can I best support you in this moment?",
+            "What would be most helpful for you to explore right now?",
+            "How are you feeling about sharing this with me?",
+            "What do you need most in this conversation?",
+            "How has this been affecting your daily life?"
         ]
-    }
 
-    sentiment = tone.get('sentiment', 'neutral')
-    base_response = sentiment_responses.get(sentiment, sentiment_responses['neutral'])[0]
+        import random
+        response += random.choice(follow_ups)
 
-    # Add emotional validation
-    if sentiment == 'negative':
-        base_response += " It's completely valid to feel this way. "
-    elif sentiment == 'positive':
-        base_response += " It's important to acknowledge these positive feelings. "
+        return response
 
-    # Add insights from reasoning
-    if insights.get('past_connections'):
-        connections = str(insights['past_connections'])[:150]
-        if connections:
-            base_response += f"I notice this connects to what you've shared before about {connections}... "
-
-    if insights.get('emotional_progress'):
-        progress = str(insights['emotional_progress'])[:100]
-        if progress:
-            base_response += f"I see some emotional growth here: {progress}. "
-
-    if insights.get('recurring_problems'):
-        patterns = str(insights['recurring_problems'])[:100]
-        if patterns:
-            base_response += f"We might be seeing some patterns emerge around {patterns}. "
-
-    # Add follow-up questions
-    follow_ups = [
-        "How does this make you feel right now?",
-        "What would you like to explore more about this?",
-        "How can I best support you in this moment?",
-        "What thoughts come up when you reflect on this?",
-        "Is there anything specific you'd like to work on together?"
-    ]
-
-    import random
-    follow_up = random.choice(follow_ups)
-    base_response += follow_up
-
-    return base_response
+    except Exception as e:
+        print(f"Error in fallback response generation: {str(e)}")
+        return "Thank you for sharing that with me. I'm here to listen and support you. How are you feeling right now?"
 
 # Initialize Flask application
 app = Flask(__name__)
@@ -173,7 +210,22 @@ def analyze():
             ltm_logs.append({"error": f"LTM store failed: {str(e)}"})
 
         # Generate conversational response
-        response_text = generate_therapist_response(result, insights, tone)
+        response_text = generate_therapist_response(result, insights, tone, user_id, transcript)
+
+        # Learn from this interaction for future improvements
+        try:
+            cognition = InternalCognition(user_id=user_id)
+            # Get the understanding result from the response generation (this is a simplified approach)
+            understanding_result = cognition.deep_semantic_understanding(transcript, result, tone)
+            # Learn from the interaction (next_message would be available in future interactions)
+            learning_points = cognition.learn_from_interaction(
+                understanding_result,
+                response_text,
+                ""  # Next message not available yet
+            )
+            print(f"Learning from interaction: {learning_points}")
+        except Exception as learning_error:
+            print(f"Learning error: {str(learning_error)}")
 
         # Return the conversational response
         return jsonify({
