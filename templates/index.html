@@ -1,187 +1,116 @@
 <!DOCTYPE html>
 <html>
   <head>
-    <title>AGI Therapist Perception-Memory Integrated</title>
+    <title>AGI Therapist: Perception-Memory-Cognition</title>
     <style>
       body {
-        font-family: Arial, sans-serif;
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
         display: flex;
         justify-content: center;
         align-items: center;
-        height: 100vh;
+        min-height: 100vh;
         margin: 0;
-        background-color: #f0f0f0;
+        background-color: #f4f7f6;
       }
       .container {
         text-align: center;
         background: white;
-        padding: 20px;
-        border-radius: 10px;
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        padding: 30px;
+        border-radius: 15px;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+        width: 90%;
+        max-width: 800px;
         max-height: 90vh;
         overflow-y: auto;
       }
       button {
-        padding: 10px 20px;
+        padding: 12px 25px;
         font-size: 16px;
         margin: 10px;
         cursor: pointer;
         border: none;
-        border-radius: 5px;
+        border-radius: 25px;
         color: white;
+        transition: transform 0.2s, background-color 0.2s;
       }
-      #start {
-        background-color: #4caf50;
-      }
-      #start:hover {
-        background-color: #45a049;
-      }
-      #stop {
-        background-color: #f44336;
-        display: none;
-      }
-      #stop:hover {
-        background-color: #da190b;
-      }
-      button:disabled {
-        background-color: #cccccc;
-        cursor: not-allowed;
-      }
-      #timer {
-        margin: 10px;
-        font-size: 18px;
-        color: #333;
-      }
-      #loading {
-        display: none;
-        margin-top: 20px;
-      }
-      #result-section {
+      #start { background-color: #2ecc71; }
+      #start:hover { background-color: #27ae60; transform: scale(1.05); }
+      #stop { background-color: #e74c3c; display: none; }
+      #stop:hover { background-color: #c0392b; transform: scale(1.05); }
+      
+      .section {
         margin-top: 20px;
         text-align: left;
-        background: #e9e9e9;
-        padding: 10px;
-        border-radius: 5px;
-        max-width: 600px;
-        max-height: 200px;
-        overflow-y: auto;
-        margin-left: auto;
-        margin-right: auto;
+        padding: 15px;
+        border-radius: 8px;
+        font-size: 14px;
       }
-      .memory-section {
-        margin-top: 20px;
-        text-align: left;
-        background: #e9e9e9;
-        padding: 10px;
-        border-radius: 5px;
-        max-width: 600px;
-        max-height: 200px;
-        overflow-y: auto;
-        margin-left: auto;
-        margin-right: auto;
-      }
-      .memory-section h3 {
-        margin-top: 0;
-      }
-      @keyframes spin {
-        0% {
-          transform: rotate(0deg);
-        }
-        100% {
-          transform: rotate(360deg);
-        }
-      }
+      .perception-box { background: #e8f4fd; border-left: 5px solid #3498db; }
+      .cognition-box { background: #fff9db; border-left: 5px solid #f1c40f; }
+      .memory-box { background: #f2f2f2; border-left: 5px solid #7f8c8d; }
+      
+      pre { white-space: pre-wrap; word-wrap: break-word; }
+      #loading { display: none; margin: 20px 0; font-weight: bold; color: #3498db; }
     </style>
   </head>
   <body>
     <div class="container">
-      <h1>AGI Therapist Perception-Memory Integrated</h1>
-      <p>
-        Click start to begin recording (max 10 seconds). Click stop to analyze.
-      </p>
+      <h1>AGI Therapist Integrated System</h1>
+      <p> Research Project: 7th Sem</p>
+      
+      <div id="timer">Time: 0s</div>
       <button id="start" onclick="startRecording()">Start Recording</button>
       <button id="stop" onclick="stopRecording()">Stop Recording</button>
-      <div id="timer">Time: 0s</div>
-      <div id="loading">
-        <p>Processing... Please wait.</p>
-        <div
-          style="
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #3498db;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 2s linear infinite;
-            margin: 20px auto;
-          "
-        ></div>
+
+      <div id="loading">🧠 AGI is Thinking...</div>
+
+      <div class="section cognition-box">
+        <h3>🧠 Therapeutic Insights (Brain)</h3>
+        <div id="insight-summary" style="font-weight: bold; margin-bottom: 10px; color: #856404;"></div>
+        <pre id="cognition-details">Waiting for audio analysis...</pre>
       </div>
-      <div id="result-section">
-        <h3>Perception Result</h3>
-        <div id="result"></div>
+
+      <div class="section perception-box">
+        <h3>🎙️ Perception Result</h3>
+        <pre id="result">Transcript will appear here...</pre>
       </div>
-      <div class="memory-section">
-        <h3>Working Memory Logs</h3>
-        <div id="wm-logs"></div>
-      </div>
-      <div class="memory-section">
-        <h3>Long-Term Memory Logs</h3>
-        <div id="ltm-logs"></div>
+
+      <div class="section memory-box">
+        <h3>💾 Memory Logs (LTM)</h3>
+        <pre id="ltm-logs">Historical data will appear here...</pre>
       </div>
     </div>
+
     <script>
       let mediaRecorder;
       let audioChunks = [];
       let startTime;
       let timerInterval;
-      const maxDuration = 10; // seconds
 
       async function startRecording() {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-          });
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           mediaRecorder = new MediaRecorder(stream);
           audioChunks = [];
           startTime = Date.now();
-
-          mediaRecorder.ondataavailable = (event) => {
-            audioChunks.push(event.data);
-          };
-
+          mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
           mediaRecorder.onstop = () => {
-            stream.getTracks().forEach((track) => track.stop());
+            stream.getTracks().forEach(t => t.stop());
             sendAudio();
           };
-
           mediaRecorder.start();
           document.getElementById("start").style.display = "none";
           document.getElementById("stop").style.display = "inline-block";
-          document.getElementById("timer").innerText = "Time: 0s";
-
-          // Timer
           timerInterval = setInterval(() => {
             const elapsed = Math.floor((Date.now() - startTime) / 1000);
             document.getElementById("timer").innerText = `Time: ${elapsed}s`;
-            if (elapsed >= maxDuration) {
-              stopRecording();
-            }
+            if (elapsed >= 10) stopRecording();
           }, 1000);
-
-          // Auto stop after max duration
-          setTimeout(() => {
-            if (mediaRecorder && mediaRecorder.state === "recording") {
-              stopRecording();
-            }
-          }, maxDuration * 1000);
-        } catch (error) {
-          document.getElementById("result").innerText =
-            "Error accessing microphone: " + error.message;
-        }
+        } catch (err) { alert("Mic error: " + err); }
       }
 
       function stopRecording() {
-        if (mediaRecorder && mediaRecorder.state === "recording") {
+        if (mediaRecorder?.state === "recording") {
           mediaRecorder.stop();
           clearInterval(timerInterval);
           document.getElementById("stop").style.display = "none";
@@ -193,29 +122,26 @@
         const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
         const formData = new FormData();
         formData.append("audio", audioBlob, "recording.wav");
+        formData.append("user_id", "Vaibhav_Test");
 
-        const loading = document.getElementById("loading");
-        const result = document.getElementById("result");
-        const wmLogs = document.getElementById("wm-logs");
-        const ltmLogs = document.getElementById("ltm-logs");
-        loading.style.display = "block";
-        result.innerText = "";
-        wmLogs.innerText = "";
-        ltmLogs.innerText = "";
-
+        document.getElementById("loading").style.display = "block";
+        
         try {
-          const response = await fetch("/analyze", {
-            method: "POST",
-            body: formData,
-          });
+          const response = await fetch("/analyze", { method: "POST", body: formData });
           const data = await response.json();
-          result.innerText = JSON.stringify(data.perception, null, 2);
-          wmLogs.innerText = JSON.stringify(data.working_memory, null, 2);
-          ltmLogs.innerText = JSON.stringify(data.long_term_memory, null, 2);
-        } catch (error) {
-          result.innerText = "Error: " + error.message;
+
+          // Update UI with Data
+          document.getElementById("result").innerText = `Transcript: "${data.transcript}"\n\n${JSON.stringify(data.perception, null, 2)}`;
+          
+          document.getElementById("insight-summary").innerText = `Recommendation: ${data.recommendation}`;
+          document.getElementById("cognition-details").innerText = JSON.stringify(data.cognitive_insights, null, 2);
+          
+          document.getElementById("ltm-logs").innerText = JSON.stringify(data.long_term_memory, null, 2);
+
+        } catch (err) {
+          document.getElementById("cognition-details").innerText = "Error: " + err;
         } finally {
-          loading.style.display = "none";
+          document.getElementById("loading").style.display = "none";
         }
       }
     </script>
