@@ -107,20 +107,15 @@ def generate_fallback_response(tone, insights):
         print(f"Error in fallback response generation: {str(e)}")
         return "Thank you for sharing that with me. I'm here to listen and support you. How are you feeling right now?"
 
-# Initialize Flask application
 app = Flask(__name__)
 
-# Initialize memory modules for short-term and long-term memory
-wm = WorkingMemory() # Working memory instance
+# Initialize memory modules
+wm = WorkingMemory()
+wm_logs = [] 
+ltm_logs = [] 
 
-# In-memory logs for display in the web interface
-wm_logs = [] # Logs for working memory operations
-ltm_logs = [] # Logs for long-term memory operations
-
-# Define the route for the index page
 @app.route('/')
 def index():
-    # Render the index.html template
     return render_template('index.html')
 
 # Define the route for starting a conversation
@@ -152,10 +147,7 @@ def start_conversation():
 def analyze():
     print("Analyze route called")
     try:
-        # Get user_id from the request form data, default to 'default' if not provided
         user_id = request.form.get('user_id', 'default')
-
-        # Initialize long-term memory instance for the specific user
         ltm = LongTermMemory(user_id=user_id)
 
         # Check if text is provided
@@ -180,7 +172,6 @@ def analyze():
             return jsonify({"error": "No text or audio provided"}), 400
         # Analyze the tone of the transcribed text
         tone = analyze_tone(transcript)
-        # Process the transcribed text and tone using natural language understanding
         result = nlu_process(transcript, tone)
 
         # Initialize user life understanding
@@ -237,34 +228,9 @@ def analyze():
                 "insights": insights
             }
         })
+
     except Exception as e:
-        # Handle any exceptions and return an error message as a JSON response
         return jsonify({"error": str(e)}), 500
-
-# Define a route to test the working memory
-@app.route('/test_wm', methods=['GET'])
-def test_wm():
-    """
-    Test the working memory by storing and retrieving a value.
-    """
-    wm.store({"test": "test"}, "1")
-    result = wm.retrieve("test")
-    wm.clear()
-    return jsonify({"result": result})
-
-# Define a route to test the long-term memory
-@app.route('/test_ltm', methods=['GET'])
-def test_ltm():
-    """
-    Test the long-term memory by storing, retrieving, and updating a value.
-    """
-    user_id = request.args.get('user_id', 'default')
-    ltm = LongTermMemory(user_id=user_id)
-    ltm.store("test", "1")
-    result = ltm.retrieve("test")
-    ltm.update("1", "test2")
-    result2 = ltm.retrieve("test2")
-    return jsonify({"result": result, "result2": result2})
 
 if __name__ == '__main__':
     app.run(debug=True)

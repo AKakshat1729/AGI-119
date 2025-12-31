@@ -280,8 +280,7 @@
       const typingIndicator = document.getElementById("typingIndicator");
 
       let mediaRecorder;
-      let audioChunks = [];
-      let isRecording = false;
+      let audioChunks = [];      let isRecording = false;
 
       // Initialize conversation
       startConversation();
@@ -330,9 +329,7 @@
 
       async function startRecording() {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-          });
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           mediaRecorder = new MediaRecorder(stream);
           audioChunks = [];
 
@@ -345,7 +342,6 @@
             const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
             processMessage({ audio: audioBlob });
           };
-
           mediaRecorder.start();
           isRecording = true;
           recordBtn.classList.add("recording");
