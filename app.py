@@ -10,6 +10,7 @@ from memory.long_term_memory import LongTermMemory
 from reasoning.user_life_understanding import UserLifeUnderstanding
 from reasoning.internal_cognition import InternalCognition
 from config import validate_api_keys
+from perception.reasoning.insight import InsightGenerator
 
 # Validate API keys on startup
 api_errors = validate_api_keys()
@@ -127,7 +128,7 @@ def start_conversation():
     ltm = LongTermMemory(user_id=user_id)
     try:
         previous_data = ltm.get_all()
-        if previous_data and previous_data.get('documents') and len(previous_data['documents']) > 0:
+        if previous_data and previous_data.get('documents') and len(previous_data['documents'] or []) > 0:
             greeting = "Welcome back! I remember we've talked before. How are you feeling today? I'm here to listen and support you."
         else:
             greetings = [
@@ -145,80 +146,78 @@ def start_conversation():
 # Define the route for analyzing audio input
 @app.route('/analyze', methods=['POST'])
 def analyze():
-    print("Analyze route called")
+    print("\n--- NEW REQUEST ---")
     try:
         user_id = request.form.get('user_id', 'default')
         ltm = LongTermMemory(user_id=user_id)
 
-        # Check if text is provided
+        # 1. Get Input
         if 'text' in request.form and request.form['text'].strip():
             transcript = request.form['text'].strip()
-        # Check if audio file is present in the request
         elif 'audio' in request.files:
             audio_file = request.files['audio']
             if audio_file.filename == '':
                 return jsonify({"error": "No audio file selected"}), 400
 
-            # Save uploaded audio to a temporary WAV file
             with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
                 filename = f.name
             audio_file.save(filename)
 
-            # Transcribe the audio file using speech-to-text
             transcript = transcribe_audio(filename)
-            # Clean up the temporary audio file
             os.unlink(filename)
         else:
             return jsonify({"error": "No text or audio provided"}), 400
-        # Analyze the tone of the transcribed text
+
+        # --- DEBUG POINT 1: Check Transcript ---
+        print(f"DEBUG 1 (Transcript Type): {type(transcript)}")
+        # If this is a list, fix it immediately:
+        if isinstance(transcript, list):
+            transcript = " ".join(transcript)
+            print("Action: Fixed transcript from list to string.")
+
+        # 2. Perception
         tone = analyze_tone(transcript)
         result = nlu_process(transcript, tone)
 
-        # Initialize user life understanding
-        ulu = UserLifeUnderstanding(user_id=user_id)
+        # --- DEBUG POINT 2: Check NLU Result ---
+        print(f"DEBUG 2 (Result Type): {type(result)}")
 
-        # Get insights from long-term memory
+        # 3. Reasoning & Insights
+# 3. Reasoning & Insights
+        ulu = UserLifeUnderstanding(user_id=user_id)
+        
+        # Initialize the required Insight component
+        ig =InsightGenerator(user_id=user_id)
+        
+        # Get the specific insights from insight.py
+        # (Assuming 'generate' is the method name in your insight.py)
+        additional_insights = ig.generate(transcript) 
+
         insights = {
             'past_connections': ulu.connect_past_present(transcript),
             'recurring_problems': ulu.analyze_recurring_problems(),
             'life_story': ulu.build_life_story(),
             'emotional_progress': ulu.recognize_emotional_progress(),
-            'consistency_context': ulu.maintain_consistency(transcript)
+            'consistency_context': ulu.maintain_consistency(transcript),
+            
+            # INTEGRATION POINT: Add the results from insight.py here
+            'cognitive_insights': additional_insights 
         }
 
-        # Store the result in working memory
-        try:
-            wm.store(json.dumps(result), str(len(wm_logs)))
-            wm_logs.append(result)
-        except Exception as e:
-            wm_logs.append({"error": f"WM store failed: {str(e)}"})
+        # 4. Memory Storage
+        # Note: Using len(wm_logs) safely
+        wm.store(json.dumps(result), str(len(wm_logs or [])))
+        wm_logs.append(result)
 
-        # Store the result in long-term memory
-        try:
-            ltm.store(json.dumps(result), str(len(ltm_logs)))
-            ltm_logs.append(result)
-        except Exception as e:
-            ltm_logs.append({"error": f"LTM store failed: {str(e)}"})
+        ltm.store(json.dumps(result), str(len(ltm_logs or [])))
+        ltm_logs.append(result)
 
-        # Generate conversational response
+        # 5. Response Generation
+        # --- DEBUG POINT 3: Check types before reasoning ---
+        print(f"DEBUG 3: Passing {type(transcript)} to reasoning module.")
+        
         response_text = generate_therapist_response(result, insights, tone, user_id, transcript)
 
-        # Learn from this interaction for future improvements
-        try:
-            cognition = InternalCognition(user_id=user_id)
-            # Get the understanding result from the response generation (this is a simplified approach)
-            understanding_result = cognition.deep_semantic_understanding(transcript, result, tone)
-            # Learn from the interaction (next_message would be available in future interactions)
-            learning_points = cognition.learn_from_interaction(
-                understanding_result,
-                response_text,
-                ""  # Next message not available yet
-            )
-            print(f"Learning from interaction: {learning_points}")
-        except Exception as learning_error:
-            print(f"Learning error: {str(learning_error)}")
-
-        # Return the conversational response
         return jsonify({
             "message": response_text,
             "type": "bot",
@@ -230,7 +229,10 @@ def analyze():
         })
 
     except Exception as e:
+        print(f"CRITICAL ERROR in /analyze: {str(e)}")
+        # This will show you exactly which line failed in the console
+        import traceback
+        traceback.print_exc() 
         return jsonify({"error": str(e)}), 500
-
 if __name__ == '__main__':
     app.run(debug=True)

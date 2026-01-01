@@ -5,11 +5,11 @@ import asyncio, threading, sys
 from perception.stt.stt_live import start_stt, stop_stream
 from perception.tone.tone_sentiment_live import analyze_tone
 from perception.nlu.nlu_live import nlu_process
-from perception.reasoning.insight import TheraputicInsight
+from perception.reasoning.insight import InsightGenerator
 # In main_live.py
 
 # Initialize the analyzer once
-insight_analyzer = TheraputicInsight()
+insight_analyzer = InsightGenerator()
 
 
 def handle_text(text, pitch=None):
