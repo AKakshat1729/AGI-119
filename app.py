@@ -9,6 +9,8 @@ from memory.working_memory import WorkingMemory
 from memory.long_term_memory import LongTermMemory
 from reasoning.user_life_understanding import UserLifeUnderstanding
 from reasoning.internal_cognition import InternalCognition
+# New Import for the Insight module
+from perception.reasoning.insight import InsightGenerator 
 from config import validate_api_keys
 
 # Validate API keys on startup
@@ -20,7 +22,15 @@ if api_errors:
     print("\nPlease configure the missing API keys in config.py before running the application.")
     exit(1)
 
-# Function to generate therapist-like responses using Internal Cognition and Self-Reflection
+app = Flask(__name__)
+
+# Initialize memory modules
+wm = WorkingMemory()
+wm_logs = [] 
+ltm_logs = [] 
+
+# --- CORE FUNCTIONS ---
+
 def generate_therapist_response(perception_result, insights, tone, user_id="default", transcript=""):
     try:
         # Initialize Internal Cognition system
@@ -40,185 +50,143 @@ def generate_therapist_response(perception_result, insights, tone, user_id="defa
             uncertainty_analysis
         )
 
-        # Perform self-reflection on the generated response
-        # (This would typically happen after getting user feedback, but we include it for completeness)
+        # Self-reflection (logging only)
         reflection = cognition.self_reflect_on_response(
             response_text,
-            "",  # No immediate feedback available
+            "", 
             understanding_result
         )
 
-        # Log the internal cognition process for analysis
+        # Log the internal cognition process
         cognition_log = {
             'understanding': understanding_result,
             'uncertainty': uncertainty_analysis,
             'reflection': reflection,
             'response': response_text
         }
-
         print(f"Internal Cognition Analysis: {json.dumps(cognition_log, indent=2)}")
 
         return response_text
 
     except Exception as e:
         print(f"Unexpected error in generate_therapist_response: {str(e)}")
-        # Fallback to basic response
         return generate_fallback_response(tone, insights)
 
-# Fallback response generator for when internal cognition fails
 def generate_fallback_response(tone, insights):
     """Generate a therapeutic response when internal cognition fails."""
     try:
         sentiment = tone.get('sentiment', 'neutral') if tone else 'neutral'
         confidence = tone.get('confidence', 0.5) if tone else 0.5
 
-        # Base response based on sentiment
         if sentiment == 'negative' and confidence > 0.6:
-            response = "I can sense this is difficult for you right now. It's completely valid to feel this way, and it's brave of you to share it. "
+            response = "I can sense this is difficult for you right now. It's completely valid to feel this way. "
         elif sentiment == 'positive' and confidence > 0.6:
-            response = "I'm glad to hear you're feeling positive about this. It's important to acknowledge and celebrate these positive feelings. "
+            response = "I'm glad to hear you're feeling positive about this. "
         else:
-            response = "Thank you for sharing that with me. I appreciate you opening up about this. "
+            response = "Thank you for sharing that with me. "
 
-        # Add insights from user life understanding if available
+        # Add insights if available
         if insights:
             if insights.get('past_connections'):
-                response += "I notice this connects to what you've shared before about your experiences. "
-            if insights.get('recurring_problems'):
-                response += "This seems to be something you've been working through. "
-            if insights.get('emotional_progress'):
-                response += "It's good to see how you're growing through these experiences. "
+                response += "I notice this connects to what you've shared before. "
+            if insights.get('cognitive_insights') and insights['cognitive_insights'].get('needs_intervention'):
+                 response += "It seems like we've hit a recurring theme here. "
 
-        # Add therapeutic follow-up
         follow_ups = [
             "How can I best support you in this moment?",
             "What would be most helpful for you to explore right now?",
-            "How are you feeling about sharing this with me?",
-            "What do you need most in this conversation?",
-            "How has this been affecting your daily life?"
+            "How are you feeling about sharing this with me?"
         ]
-
         import random
         response += random.choice(follow_ups)
 
         return response
-
     except Exception as e:
-        print(f"Error in fallback response generation: {str(e)}")
-        return "Thank you for sharing that with me. I'm here to listen and support you. How are you feeling right now?"
+        return "Thank you for sharing that. I'm here to listen. How are you feeling right now?"
 
-app = Flask(__name__)
-
-# Initialize memory modules
-wm = WorkingMemory()
-wm_logs = [] 
-ltm_logs = [] 
+# --- ROUTES ---
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# Define the route for starting a conversation
 @app.route('/start_conversation', methods=['POST'])
 def start_conversation():
     user_id = request.form.get('user_id', 'default')
-
-    # Check if user has previous conversations
     ltm = LongTermMemory(user_id=user_id)
     try:
         previous_data = ltm.get_all()
-        if previous_data and previous_data.get('documents') and len(previous_data['documents']) > 0:
-            greeting = "Welcome back! I remember we've talked before. How are you feeling today? I'm here to listen and support you."
+        # Safe check for previous conversations
+        documents = previous_data.get('documents') or []
+        if documents and len(documents) > 0:
+            greeting = "Welcome back! I remember we've talked before. How are you feeling today?"
         else:
             greetings = [
-                "Hello! I'm your AI therapist. I'm here to listen without judgment and help you explore your thoughts and feelings. How are you doing today?",
-                "Hi there! Welcome to our conversation. I'm here to support you on your journey. What's on your mind today?",
-                "Greetings! I'm glad you've reached out. Therapy is about creating a safe space for you to express yourself. How are you feeling right now?"
+                "Hello! I'm your AI therapist. I'm here to listen without judgment. How are you doing today?",
+                "Hi there! Welcome. I'm here to support you. What's on your mind?"
             ]
             import random
             greeting = random.choice(greetings)
     except:
-        greeting = "Hello! I'm your AI therapist. How are you feeling today? You can type your message or record audio."
+        greeting = "Hello! I'm your AI therapist. How are you feeling today?"
 
     return jsonify({"message": greeting, "type": "bot"})
 
-# Define the route for analyzing audio input
 @app.route('/analyze', methods=['POST'])
 def analyze():
-    print("Analyze route called")
+    print("\n--- NEW REQUEST ---")
     try:
         user_id = request.form.get('user_id', 'default')
         ltm = LongTermMemory(user_id=user_id)
 
-        # Check if text is provided
+        # 1. Get Input
         if 'text' in request.form and request.form['text'].strip():
             transcript = request.form['text'].strip()
-        # Check if audio file is present in the request
         elif 'audio' in request.files:
             audio_file = request.files['audio']
             if audio_file.filename == '':
                 return jsonify({"error": "No audio file selected"}), 400
-
-            # Save uploaded audio to a temporary WAV file
             with tempfile.NamedTemporaryFile(suffix='.wav', delete=False) as f:
                 filename = f.name
             audio_file.save(filename)
-
-            # Transcribe the audio file using speech-to-text
             transcript = transcribe_audio(filename)
-            # Clean up the temporary audio file
             os.unlink(filename)
         else:
             return jsonify({"error": "No text or audio provided"}), 400
-        # Analyze the tone of the transcribed text
+
+        # Fix transcript if it's a list (common bug)
+        if isinstance(transcript, list):
+            transcript = " ".join(transcript)
+
+        # 2. Perception
         tone = analyze_tone(transcript)
         result = nlu_process(transcript, tone)
 
-        # Initialize user life understanding
+        # 3. Reasoning & Insights
         ulu = UserLifeUnderstanding(user_id=user_id)
+        
+        # Initialize Insight Generator
+        ig = InsightGenerator(user_id=user_id)
+        additional_insights = ig.generate(transcript)
 
-        # Get insights from long-term memory
         insights = {
             'past_connections': ulu.connect_past_present(transcript),
             'recurring_problems': ulu.analyze_recurring_problems(),
             'life_story': ulu.build_life_story(),
             'emotional_progress': ulu.recognize_emotional_progress(),
-            'consistency_context': ulu.maintain_consistency(transcript)
+            'consistency_context': ulu.maintain_consistency(transcript),
+            'cognitive_insights': additional_insights
         }
 
-        # Store the result in working memory
-        try:
-            wm.store(json.dumps(result), str(len(wm_logs)))
-            wm_logs.append(result)
-        except Exception as e:
-            wm_logs.append({"error": f"WM store failed: {str(e)}"})
+        # 4. Memory Storage
+        wm.store(json.dumps(result), str(len(wm_logs or [])))
+        wm_logs.append(result)
+        ltm.store(json.dumps(result), str(len(ltm_logs or [])))
+        ltm_logs.append(result)
 
-        # Store the result in long-term memory
-        try:
-            ltm.store(json.dumps(result), str(len(ltm_logs)))
-            ltm_logs.append(result)
-        except Exception as e:
-            ltm_logs.append({"error": f"LTM store failed: {str(e)}"})
-
-        # Generate conversational response
+        # 5. Response Generation
         response_text = generate_therapist_response(result, insights, tone, user_id, transcript)
 
-        # Learn from this interaction for future improvements
-        try:
-            cognition = InternalCognition(user_id=user_id)
-            # Get the understanding result from the response generation (this is a simplified approach)
-            understanding_result = cognition.deep_semantic_understanding(transcript, result, tone)
-            # Learn from the interaction (next_message would be available in future interactions)
-            learning_points = cognition.learn_from_interaction(
-                understanding_result,
-                response_text,
-                ""  # Next message not available yet
-            )
-            print(f"Learning from interaction: {learning_points}")
-        except Exception as learning_error:
-            print(f"Learning error: {str(learning_error)}")
-
-        # Return the conversational response
         return jsonify({
             "message": response_text,
             "type": "bot",
@@ -230,6 +198,9 @@ def analyze():
         })
 
     except Exception as e:
+        print(f"CRITICAL ERROR in /analyze: {str(e)}")
+        import traceback
+        traceback.print_exc() 
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':

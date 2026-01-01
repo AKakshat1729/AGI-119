@@ -37,7 +37,7 @@ class InternalCognition:
         return {
             "deeper_meaning": deeper_meaning,
             "true_intent": true_intent,
-            "context_relevance": len(past_docs) > 0,
+            "context_relevance": len(past_docs or []) > 0,
             "confidence": self._calculate_understanding_confidence(nlu_result, tone)
         }
 
