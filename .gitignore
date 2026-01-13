@@ -138,3 +138,5 @@ dmypy.json
 Thumbs.db
 config.py
 .env
+# Ignore ALL ChromaDB database folders
+long_term_memory_db_*/
