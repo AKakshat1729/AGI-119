@@ -178,7 +178,7 @@ def logout():
 # Define the route for starting a conversation
 @app.route('/start_conversation', methods=['POST'])
 def start_conversation():
-    user_id = current_user.id
+    user_id = request.form.get('user_id', 'default')
 
     # Check if user has previous conversations
     ltm = LongTermMemory(user_id=user_id)
@@ -204,7 +204,7 @@ def start_conversation():
 def analyze():
     try:
         print("Analyze route called")
-        user_id = current_user.id
+        user_id = request.form.get('user_id', 'default')
         print(f"User ID: {user_id}")
 
         # Initialize long-term memory instance for the specific user
