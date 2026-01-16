@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login - AGI-119</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+            color: #333;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.95);
+            padding: 40px;
+            border-radius: 20px;
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.1);
+            width: 350px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        h2 {
+            text-align: center;
+            color: #4a5568;
+            margin-bottom: 30px;
+            font-weight: 600;
+        }
+        form {
+            display: flex;
+            flex-direction: column;
+        }
+        .input-group {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        label {
+            margin-bottom: 8px;
+            color: #4a5568;
+            font-weight: 500;
+        }
+        input[type="email"], input[type="password"] {
+            padding: 15px;
+            border: 2px solid #e2e8f0;
+            border-radius: 12px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: white;
+            width: 100%;
+            box-sizing: border-box;
+        }
+        input[type="email"]:focus, input[type="password"]:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        }
+        .toggle-password {
+            position: absolute;
+            right: 15px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #667eea;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        input[type="submit"] {
+            padding: 15px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        input[type="submit"]:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.3);
+        }
+        p {
+            text-align: center;
+            margin-top: 20px;
+        }
+        a {
+            color: #667eea;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        a:hover {
+            text-decoration: underline;
+        }
+        .error {
+            color: #e53e3e;
+            text-align: center;
+            background: #fed7d7;
+            padding: 10px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        </style>
+        <script>
+            function togglePassword(id) {
+                const input = document.getElementById(id);
+                const button = input.nextElementSibling;
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    button.textContent = 'Hide';
+                } else {
+                    input.type = 'password';
+                    button.textContent = 'Show';
+                }
+            }
+        </script>
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>Login</h2>
+        <form method="post">
+            <label>Email: <input type="email" name="email" required></label>
+            <div class="input-group">
+                <label>Password: <input type="password" name="password" id="login-password" required></label>
+                <button type="button" class="toggle-password" onclick="togglePassword('login-password')">Show</button>
+            </div>
+            <input type="submit" value="Login">
+        </form>
+        <p>Don't have an account? <a href="{{ url_for('signup') }}">Sign up</a></p>
+        {% with messages = get_flashed_messages() %}
+            {% if messages %}
+                <div class="error">
+                    {% for message in messages %}
+                        <p>{{ message }}</p>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+    </div>
+</body>
+</html>

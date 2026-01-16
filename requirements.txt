@@ -8,3 +8,9 @@ aiohttp
 requests
 chromadb
 librosa
+flask
+fastapi
+assemblyai
+openai
+flask-login
+tiktoken

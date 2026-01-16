@@ -4,13 +4,14 @@ from core.agi_agent import AGI119Agent
 from core.emotion_detector import detect_emotion
 import os
 
-aai.settings.api_key = os.getenv("ASSEMBLYAI_API_KEY")
+aai.settings.api_key = "4bedc386183f491b9d12365c4d91e1a3"
 
 app = FastAPI()
 agent = AGI119Agent()
 
 @app.post("/voice-chat")
 async def voice_chat(audio: UploadFile = File(...)):
+    
     audio_path = f"temp_{audio.filename}"
     with open(audio_path, "wb") as f:
         f.write(await audio.read())

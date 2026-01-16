@@ -1,101 +1,62 @@
-# AGI Therapist: Cognitive Architecture Project
+# AGI-119
 
-**Project:** AGI-119 / My-Virtual-Therapist
-**Type:** Advanced AI Cognitive System (BCA 3rd Year Capstone)
+This is a Flask application that provides a personalized AI therapist with user authentication, per-user memory storage, and LLM-powered responses.
 
-## 📋 Project Overview
-This is not just a chatbot; it is a multi-modular **Cognitive Architecture** designed for automated therapeutic interaction. Unlike simple LLM wrappers, this system utilizes distinct modules for Perception, Memory, Reasoning, and Safety to create a "Hybrid Brain."
+## Features
 
-It features a **Unified Vector Memory** system that bridges different code modules into a single long-term storage, ensuring data consistency and context retention.
+- User authentication (signup/login)
+- Per-user memory: profiles, episodic memories, conversation logs
+- Vector search for memory retrieval
+- Dynamic prompt building with token budgeting
+- LLM integration (OpenAI GPT-3.5-turbo)
+- Safety guardrails for crisis detection
+- Voice and text input support
 
----
+## Setup
 
-## 🚀 Key Technical Features
+1. **Install Dependencies:**
 
-### 1. 🧠 Unified Vector Memory (ChromaDB)
-- **Architecture:** Centralized Vector Database for Long-Term Memory.
-- **Data Bridging:** Solved "Split Brain" issues by bridging the `core` module (teammate's code) with the `memory` module into a single persistent database.
-- **Capabilities:** Semantic search, automatic timestamping, and cross-module retrieval.
-
-### 2. 🛡️ Ethical Safety & Perception
-- **Safety Gatekeeper:** A dedicated `EthicalAwarenessEngine` intercepts user input *before* processing. It detects high-risk phrases (e.g., self-harm) and overrides the system to provide immediate help.
-- **Style Engine:** Analyzes sentiment polarity to dynamically suggest response tones (Gentle, Calm, Positive).
-
-### 3. 💡 Deep Reasoning (Internal Cognition)
-- **Intent Recognition:** Identifies "True Intent" (e.g., seeking support vs. seeking information) beyond simple keywords.
-- **Self-Reflection:** The system logs a self-critique of its own confidence levels and understanding after every interaction.
-
-### 4. 📝 Dynamic Prompt Engineering
-- **Context Construction:** Dynamically builds prompts using User History, Current Emotion, and Safety Constraints before sending them to the response generator.
-
----
-
-## 🛠️ Installation & Setup
-
-1. **Clone the repository**
    ```bash
-   git clone [https://github.com/AKakshat1729/AGI-119.git](https://github.com/AKakshat1729/AGI-119.git)
-   cd AGI-119
+   pip install -r requirements.txt
+   ```
 
+2. **Set API Keys:**
 
-#Create a Virtual Environment
+   - AssemblyAI: Set in config.py or directly in app.py
+   - OpenAI: Set openai.api_key in app.py (for embeddings)
+   - SambaNova: API key is hardcoded for demo
 
-# Windows
-python -m venv venv
-venv\Scripts\activate
+3. **Run the Application:**
 
-# Linux / macOS
-python3 -m venv venv
-source venv/bin/activate
+   ```bash
+   python app.py
+   ```
 
+   The application will be accessible at `http://127.0.0.1:5000`.
 
-#Install Dependencies
+## Endpoints
 
-pip install -r requirements.txt
+- `/login`: User login
+- `/signup`: User registration
+- `/logout`: User logout
+- `/`: Main chat interface (requires login)
+- `/start_conversation`: Start conversation (POST)
+- `/analyze`: Analyze input and get response (POST, requires login)
+- `/voice-chat`: Voice input analysis (POST)
+- `/memory/retrieve`: Retrieve user memories (GET)
+- `/memory/store`: Store memory (POST)
+- `/profile`: Get/Patch user profile (GET/PATCH)
 
-#How to Run the Demo
-#Step 1: Verify Backend & Memory Integrity
+## Architecture
 
-python verify_memory.py
+- **Memory Store**: ChromaDB with OpenAI embeddings for all memories (profiles, episodic, conversations)
+- **Prompt Builder**: Dynamic prompt composition with token limits
+- **Safety**: Keyword-based risk detection
+- **LLM**: SambaNova Meta-Llama-3.3-70B-Instruct for response generation
+- **Auth**: Flask-Login with in-memory user store
 
-#Launch the Cognitive Engine (The App)
+## Demo Scenarios
 
-#Step 2 : python app.py
-
-Open your browser at http://127.0.0.1:5000
-
-Test Emotional Intelligence: Type "I am feeling stressed but I will handle it." (Observe "Neutral/Balanced" style in terminal).
-
-Test Safety Protocol: Type "I want to kill myself." (Observe ⚠️ HIGH RISK DETECTED in terminal).
-
-
-Step 3: Audit Patient History
-
-After stopping the app (Ctrl+C)
-
-
-python view_history.py
-
-📂 Architecture Structure
-frontend/: HTML/CSS/JavaScript interface.
-
-perception/: STT (AssemblyAI) and NLU processing.
-
-memory/: ChromaDB Vector Database logic.
-
-reasoning/: Internal Cognition and Insight Generators.
-
-core/: Shared utilities (Safety, Style engines).
-
-generation/: Prompt construction and LLM interfacing.
-
-api/: External API handlers.
-
-🔮 Future Enhancements
-User Authentication & Multi-user session management.
-
-Voice Synthesis (TTS) for audio responses.
-
-Advanced Cognitive Behavioral Therapy (CBT) modules.
-
-
+1. Normal conversation: User chats about daily life.
+2. Memory-dependent: References past conversations.
+3. Crisis risk: Detects harmful keywords and responds safely.

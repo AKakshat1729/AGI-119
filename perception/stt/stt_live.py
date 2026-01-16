@@ -8,7 +8,7 @@ import numpy as np
 import asyncio
 import os
 import librosa
-from config import API_KEY   # import from root config
+from config import ASSEMBLYAI_API_KEY as API_KEY   # import from root config
 
 stop_stream = False
 
