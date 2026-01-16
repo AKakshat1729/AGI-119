@@ -1,4 +1,4 @@
-class TheraputicInsight:
+class InsightGenerator:
     """Provides therapeutic insight analysis for user conversations."""
     
     TRIGGER_KEYWORDS = ['because', 'makes me', 'always', 'whenever', 'every time']
