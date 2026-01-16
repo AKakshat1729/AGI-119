@@ -4,7 +4,12 @@ textblob
 nltk
 numpy
 flask
+flask-login
+flask-cors
 aiohttp
 requests
 chromadb
 librosa
+assemblyai
+openai
+python-dotenv
