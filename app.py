@@ -43,10 +43,19 @@ else:
     openai.api_key = os.environ.get("SAMBA_API_KEY", "587a7fba-09f4-4bb5-a0bf-7a359629d44b")
 
 # MongoDB setup
-mongo_uri = "mongodb+srv://abc:1234@cluster0.jlrvd9l.mongodb.net/"
-client = MongoClient(mongo_uri)
-db = client['agi-therapist']  # Database name
-users_collection = db['users']
+try:
+    mongo_uri = os.environ.get("MONGO_URI", "mongodb+srv://abc:1234@cluster0.jlrvd9l.mongodb.net/")
+    client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)  # 5 second timeout
+    # Test the connection
+    client.admin.command('ping')
+    db = client['agi-therapist']
+    users_collection = db['users']
+    mongo_connected = True
+    print("MongoDB connected successfully")
+except Exception as e:
+    print(f"MongoDB connection failed: {e}. Using in-memory storage.")
+    mongo_connected = False
+    users_collection = None
 
 # Initialize global modules first
 memory_store = ServerMemoryStore()
@@ -187,6 +196,9 @@ def load_user(user_id):
     return None
 
 def load_users():
+    if not mongo_connected:
+        # Fallback to in-memory storage
+        return {}
     try:
         users_data = users_collection.find()
         return {user['email']: User(user['email'], user.get('name', user.get('email', '')), user.get('email', user.get('email', '')), user['password']) for user in users_data}
@@ -195,6 +207,9 @@ def load_users():
         return {}
 
 def save_users():
+    if not mongo_connected:
+        # Fallback: users are stored in memory only
+        return
     try:
         # Clear existing users
         users_collection.delete_many({})

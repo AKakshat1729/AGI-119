@@ -13,3 +13,6 @@ librosa
 assemblyai
 openai
 python-dotenv
+gtts
+pyttsx3
+pymongo
