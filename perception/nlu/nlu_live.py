@@ -1,13 +1,14 @@
 import nltk
 
-# Download necessary NLTK data (quietly)
-nltk.download("punkt", quiet=True)
-nltk.download("punkt_tab", quiet=True)
-nltk.download("averaged_perceptron_tagger", quiet=True)
-nltk.download("averaged_perceptron_tagger_eng", quiet=True)
-nltk.download("maxent_ne_chunker", quiet=True)
-nltk.download("maxent_ne_chunker_tab", quiet=True)
-nltk.download("words", quiet=True)
+try:
+    nltk.download("punkt_tab", quiet=True)
+    nltk.download("averaged_perceptron_tagger_eng", quiet=True)
+    nltk.download("maxent_ne_chunker_tab", quiet=True)
+    nltk.download("words", quiet=True)
+    nltk.download("stopwords", quiet=True)
+except Exception as e:
+    print(f"NLTK download failed: {e}")
+    pass
 
 def get_entities(text):
     tokens = nltk.word_tokenize(text)

@@ -1,12 +1,5 @@
-import json
-from textblob import TextBlob
-from memory.long_term_memory import LongTermMemory
-
 class InsightGenerator:
-    """
-    Provides therapeutic insight analysis for user conversations.
-    Wraps 'TherapeuticInsight' logic to work with the main app.
-    """
+    """Provides therapeutic insight analysis for user conversations."""
     
     TRIGGER_KEYWORDS = ['because', 'makes me', 'always', 'whenever', 'every time']
     NEGATIVE_EMOTIONS = ['sad', 'angry', 'frustrated', 'anxious', 'depressed', 'hopeless']

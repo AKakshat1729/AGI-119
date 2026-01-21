@@ -261,7 +261,10 @@
     <div class="chat-container">
       <div class="chat-header">
         <span>🤖 AI Therapist</span>
-        <button class="logout-btn" onclick="logout()">Logout</button>
+        <div>
+          <a href="/settings" class="logout-btn" style="text-decoration: none;">Settings</a>
+          <a href="/logout" class="logout-btn" style="text-decoration: none;">Logout</a>
+        </div>
       </div>
       <div class="chat-messages" id="chatMessages">
         <div class="typing-indicator" id="typingIndicator">
@@ -385,9 +388,16 @@
         }
       }
 
+      let isProcessing = false;
+
       async function processMessage(data) {
+        if (isProcessing) return;
+        isProcessing = true;
         loading.style.display = "block";
         chatMessages.scrollTop = chatMessages.scrollHeight;
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
         try {
           const formData = new FormData();
@@ -401,7 +411,10 @@
           const response = await fetch("/analyze", {
             method: "POST",
             body: formData,
+            signal: controller.signal,
           });
+
+          clearTimeout(timeoutId);
 
           const result = await response.json();
 
@@ -412,23 +425,42 @@
             if (data.audio && result.transcript) {
               addTranscription(result.transcript);
             }
-            addMessage(result.message, "bot");
+            addMessage(result.message, "bot", result.audio_url);
           }
         } catch (error) {
           console.error("Error processing message:", error);
-          addMessage(
-            "Sorry, I encountered an error processing your message.",
-            "bot"
-          );
+          if (error.name === 'AbortError') {
+            addMessage("Request timed out. Please try again.", "bot");
+          } else {
+            addMessage(
+              "Sorry, I encountered an error processing your message.",
+              "bot"
+            );
+          }
         } finally {
           loading.style.display = "none";
+          isProcessing = false;
         }
       }
 
-      function addMessage(text, type) {
+      function addMessage(text, type, audioUrl = null) {
         const messageDiv = document.createElement("div");
         messageDiv.className = `message ${type}`;
         messageDiv.textContent = text;
+        if (audioUrl) {
+          const audio = document.createElement("audio");
+          audio.controls = true;
+          audio.src = audioUrl;
+          messageDiv.appendChild(audio);
+        }
+        chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+
+      function addTranscription(text) {
+        const messageDiv = document.createElement("div");
+        messageDiv.className = `message user`;
+        messageDiv.innerHTML = `<i>"${text}"</i>`;
         chatMessages.appendChild(messageDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
       }

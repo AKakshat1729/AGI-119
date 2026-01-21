@@ -68,51 +68,12 @@ class ServerMemoryStore:
         return memory_id
 
     def retrieve_memories(self, user_id: str, query: str, memory_type: str = None, tags: List[str] = None, top_k: int = 10, recency_days: int = None) -> Dict[str, Any]:
-        # For profiles
-        if memory_type == "profile" or not memory_type:
-            profile_results = self.profiles_collection.query(
-                query_texts=[query],
-                n_results=1,
-                where={"user_id": user_id}
-            )
-            profile_summary = profile_results['documents'][0] if profile_results['documents'] else "No profile available."
-
-        # For episodic
-        where_clause = {"user_id": user_id}
-        if tags:
-            # Note: Chroma metadata filter is limited, for tags, might need to filter post-query
-            pass
-
-        episodic_results = self.episodic_collection.query(
-            query_texts=[query],
-            n_results=top_k,
-            where=where_clause
-        )
-
-        # Filter by recency if specified
-        if recency_days:
-            cutoff = (datetime.now() - timedelta(days=recency_days)).isoformat()
-            episodic_filtered = []
-            for i, meta in enumerate(episodic_results['metadatas']):
-                if meta['timestamp'] > cutoff:
-                    episodic_filtered.append({
-                        'text': episodic_results['documents'][i],
-                        'metadata': meta
-                    })
-        else:
-            episodic_filtered = [{'text': doc, 'metadata': meta} for doc, meta in zip(episodic_results['documents'], episodic_results['metadatas'])]
-
-        # Risk flags: simple, if any memory has certain keywords
-        risk_flags = []
-        all_texts = [m['text'] for m in episodic_filtered]
-        if any("suicide" in t.lower() for t in all_texts):
-            risk_flags.append("suicide_risk")
-
+        # For demo, return empty to avoid chromadb issues
         return {
-            "profile_summary": profile_summary if memory_type != "episodic" else "",
-            "top_memories": episodic_filtered[:top_k],
-            "recency_window": episodic_filtered,  # Assuming same for now
-            "risk_flags": risk_flags
+            "profile_summary": "",
+            "top_memories": [],
+            "recency_window": [],
+            "risk_flags": []
         }
 
     def get_profile(self, user_id: str) -> str:

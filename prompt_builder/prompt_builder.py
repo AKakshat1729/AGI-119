@@ -17,7 +17,9 @@ class PromptBuilder:
             text = self.encoding.decode(tokens)
         return text
 
-    def build_prompt(self, user_id: str, current_message: str, retrieved_bundle: Dict[str, Any], style_config: Dict[str, Any]) -> Dict[str, Any]:
+    def build_prompt(self, user_id: str, current_message: str, retrieved_bundle: Dict[str, Any], style_config: Dict[str, Any], reasoning_data: Dict[str, Any] = None) -> Dict[str, Any]:
+        if reasoning_data is None:
+            reasoning_data = {}
         style = style_config.get('style', 'medium')  # short, medium, long
         therapeutic = style_config.get('therapeutic', True)
 
@@ -48,27 +50,47 @@ Do not diagnose or prescribe.
         if risk_flags:
             risk_section = "Risk Flags: " + ", ".join(risk_flags) + ". Handle with care.\n\n"
 
+        # Reasoning insights
+        reasoning_section = ""
+        if reasoning_data:
+            life_story = reasoning_data.get('life_story', '')
+            if life_story:
+                reasoning_section += f"User Life Story Summary:\n{life_story}\n\n"
+            emotional_progress = reasoning_data.get('emotional_progress', {})
+            if emotional_progress:
+                progress = emotional_progress.get('progress', 'stable')
+                reasoning_section += f"Emotional Progress: {progress}\n\n"
+            recurring_problems = reasoning_data.get('recurring_problems', [])
+            if recurring_problems:
+                problems = ", ".join([p[0] for p in recurring_problems[:5]])
+                reasoning_section += f"Recurring Problems: {problems}\n\n"
+            therapeutic_insight = reasoning_data.get('therapeutic_insight', {})
+            if therapeutic_insight:
+                insight = therapeutic_insight.get('insight', '')
+                if insight:
+                    reasoning_section += f"Therapeutic Insight: {insight}\n\n"
+
         # Current message
         user_message = f"User: {current_message}\n"
 
         # Combine
-        full_prompt = system_prompt + "\n\n" + profile_section + episodic_section + risk_section + user_message
+        full_prompt = system_prompt + "\n\n" + profile_section + episodic_section + risk_section + reasoning_section + user_message
 
         # Token budgeting
         token_count = self.count_tokens(full_prompt)
         if token_count > self.max_tokens - 200:  # Reserve for response
             # Truncate episodic section
-            max_episodic_tokens = self.max_tokens - 200 - self.count_tokens(system_prompt + profile_section + risk_section + user_message)
+            max_episodic_tokens = self.max_tokens - 200 - self.count_tokens(system_prompt + profile_section + risk_section + reasoning_section + user_message)
             episodic_text = "\n".join([f"- {mem['text']}" for mem in top_memories])
             episodic_text = self.truncate_text(episodic_text, max_episodic_tokens)
             episodic_section = "Relevant Past Memories:\n" + episodic_text + "\n"
-            full_prompt = system_prompt + "\n\n" + profile_section + episodic_section + risk_section + user_message
+            full_prompt = system_prompt + "\n\n" + profile_section + episodic_section + risk_section + reasoning_section + user_message
             token_count = self.count_tokens(full_prompt)
 
         # Messages for LLM
         messages = [
             {"role": "system", "content": system_prompt},
-            {"role": "user", "content": profile_section + episodic_section + risk_section + user_message}
+            {"role": "user", "content": profile_section + episodic_section + risk_section + reasoning_section + user_message}
         ]
 
         # Debug

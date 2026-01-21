@@ -16,5 +16,12 @@ class EmotionalReasoning:
         """
         Provides meaningful help and therapeutic insight.
         """
-        # Placeholder: Generate advice
-        return {"insight": "Consider relaxation techniques", "support": "I'm here to help"}
+        insight = "I'm here to listen."
+        if 'sad' in emotions:
+            insight = "It sounds like you're feeling down. Talking about it can help."
+        elif 'angry' in emotions:
+            insight = "Anger is a valid emotion. Let's explore what's causing it."
+        elif 'happy' in emotions:
+            insight = "It's great to hear you're feeling positive!"
+        support = "Remember, you're not alone in this."
+        return {"insight": insight, "support": support}
