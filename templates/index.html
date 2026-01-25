@@ -748,51 +748,7 @@
       const typingIndicator = document.getElementById("typingIndicator");
 
       let mediaRecorder;
-      let audioChunks = [];
-      let isRecording = false;
-      let isDarkMode = localStorage.getItem('darkMode') === 'true';
-      let currentConversationId = localStorage.getItem('currentConversationId') || null;
-
-      // Initialize the app
-      initializeApp();
-
-      // Initialize app function
-      function initializeApp() {
-        // Set up user profile
-        setupUserProfile();
-        
-        // Set up theme
-        setupTheme();
-        
-        // Load chat history
-        loadChatHistory();
-        
-        // Set up event listeners
-        setupEventListeners();
-        
-        // Load current conversation or start new
-        if (currentConversationId) {
-          loadConversation(currentConversationId);
-        } else {
-          startConversation();
-        }
-      }
-
-      // Set up user profile
-      function setupUserProfile() {
-        // Get user data from template variables
-        const userNameData = "{{ user_name }}";
-        const userEmailData = "{{ user_email }}";
-        
-        const userData = {
-          name: userNameData || "User",
-          email: userEmailData || "user@example.com"
-        };
-        
-        if (userName) userName.textContent = userData.name;
-        if (userEmail) userEmail.textContent = userData.email;
-        if (userAvatar) userAvatar.textContent = userData.name.charAt(0).toUpperCase();
-      }
+      let audioChunks = [];      let isRecording = false;
 
       // Set up theme
       function setupTheme() {
@@ -1047,9 +1003,7 @@
 
       async function startRecording() {
         try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-          });
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
           mediaRecorder = new MediaRecorder(stream);
           audioChunks = [];
 
@@ -1062,7 +1016,6 @@
             const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
             processMessage({ audio: audioBlob });
           };
-
           mediaRecorder.start();
           isRecording = true;
           recordBtn.classList.add("recording");

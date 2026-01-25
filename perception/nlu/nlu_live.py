@@ -1,15 +1,13 @@
-# nlu/nlu_live.py
 import nltk
 
-try:
-    nltk.download("punkt_tab", quiet=True)
-    nltk.download("averaged_perceptron_tagger_eng", quiet=True)
-    nltk.download("maxent_ne_chunker_tab", quiet=True)
-    nltk.download("words", quiet=True)
-    nltk.download("stopwords", quiet=True)
-except Exception as e:
-    print(f"NLTK download failed: {e}")
-    pass
+# Download necessary NLTK data (quietly)
+nltk.download("punkt", quiet=True)
+nltk.download("punkt_tab", quiet=True)
+nltk.download("averaged_perceptron_tagger", quiet=True)
+nltk.download("averaged_perceptron_tagger_eng", quiet=True)
+nltk.download("maxent_ne_chunker", quiet=True)
+nltk.download("maxent_ne_chunker_tab", quiet=True)
+nltk.download("words", quiet=True)
 
 def get_entities(text):
     tokens = nltk.word_tokenize(text)
@@ -18,9 +16,10 @@ def get_entities(text):
     entities = []
     for subtree in tree:
         if isinstance(subtree, nltk.Tree):
-            entity = " ".join([word for word, tag in subtree.leaves()])
+            # Extract the actual word string from the leaves
+            entity_name = " ".join([word for word, tag in subtree.leaves()])
             label = subtree.label()
-            entities.append({"entity": entity, "type": label})
+            entities.append({"entity": entity_name, "type": label})
     return entities
 
 def get_roles(text):
@@ -28,8 +27,10 @@ def get_roles(text):
     tags = nltk.pos_tag(tokens)
     roles = []
     for w, t in tags:
-        if t.startswith("NN"): roles.append({"word": w, "role": "entity"})
-        elif t.startswith("VB"): roles.append({"word": w, "role": "action"})
+        if t.startswith("NN"): 
+            roles.append({"word": w, "role": "entity"})
+        elif t.startswith("VB"): 
+            roles.append({"word": w, "role": "action"})
     return roles
 
 def nlu_process(text, tone_obj):

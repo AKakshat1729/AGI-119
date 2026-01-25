@@ -20,8 +20,16 @@ class WorkingMemory:
         """
         # Convert nlu_output to string for embedding
         text = str(nlu_output)
+        
         if id is None:
-            id = str(len(self.collection.get()['ids']) + 1)
+            # FIX: Safely get the current count. 
+            # If 'ids' is None (empty collection), use an empty list [] so len() returns 0.
+            existing_data = self.collection.get()
+            current_ids = existing_data.get('ids')
+            count = len(current_ids) if current_ids else 0
+            
+            id = str(count + 1)
+            
         self.collection.add(documents=[text], ids=[id])
 
     def retrieve(self, query, n_results=5):
