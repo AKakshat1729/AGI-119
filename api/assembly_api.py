@@ -1,3 +1,4 @@
+# API endpoints for assembly integration
 import assembly_api as aai
 from fastapi import FastAPI, UploadFile, File
 from core.agi_agent import AGI119Agent

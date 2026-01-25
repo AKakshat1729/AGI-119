@@ -8,7 +8,9 @@ import numpy as np
 import asyncio
 import os
 import librosa
-from config import API_KEY   # import from root config
+from dotenv import load_dotenv
+load_dotenv()
+API_KEY = os.environ.get("ASSEMBLYAI_API_KEY", "4bedc386183f491b9d12365c4d91e1a3")
 
 stop_stream = False
 
@@ -56,25 +58,33 @@ def transcribe_audio(filename):
     """
     Upload audio to AssemblyAI and get transcript
     """
-    headers = {"authorization": API_KEY}
-    with open(filename, 'rb') as f:
-        response = requests.post("https://api.assemblyai.com/v2/upload", headers=headers, data=f)
-    upload_url = response.json()["upload_url"]
+    try:
+        headers = {"authorization": API_KEY}
+        with open(filename, 'rb') as f:
+            response = requests.post("https://api.assemblyai.com/v2/upload", headers=headers, data=f)
+            response.raise_for_status()
+            upload_url = response.json()["upload_url"]
 
-    transcript_request = {
-        "audio_url": upload_url
-    }
-    response = requests.post("https://api.assemblyai.com/v2/transcript", json=transcript_request, headers=headers)
-    transcript_id = response.json()["id"]
+        transcript_request = {
+            "audio_url": upload_url
+        }
+        response = requests.post("https://api.assemblyai.com/v2/transcript", json=transcript_request, headers=headers)
+        response.raise_for_status()
+        transcript_id = response.json()["id"]
 
-    while True:
-        response = requests.get(f"https://api.assemblyai.com/v2/transcript/{transcript_id}", headers=headers)
-        data = response.json()
-        if data["status"] == "completed":
-            return data["text"]
-        elif data["status"] == "error":
-            raise Exception(data["error"])
-        time.sleep(1)
+        while True:
+            response = requests.get(f"https://api.assemblyai.com/v2/transcript/{transcript_id}", headers=headers)
+            response.raise_for_status()
+            data = response.json()
+            if data["status"] == "completed":
+                return data["text"]
+            elif data["status"] == "error":
+                raise Exception(data.get("error", "Transcription failed"))
+            time.sleep(1)
+    except requests.RequestException as e:
+        raise Exception(f"Network error during transcription: {str(e)}")
+    except KeyError as e:
+        raise Exception(f"Unexpected response format: {str(e)}")
 
 async def start_stt(handle_text):
     global stop_stream

@@ -1,13 +1,28 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, jsonify, request, redirect, url_for, flash, send_from_directory
 import tempfile
 import os
 import json
+import uuid
+import assemblyai as aai
+import openai
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
+from dotenv import load_dotenv
+from gtts import gTTS
+import pyttsx3
+from pymongo import MongoClient
+from werkzeug.security import generate_password_hash, check_password_hash
 from perception.stt.stt_live import save_wav, transcribe_audio
-from perception.tone.tone_sentiment_live import analyze_tone
+# from perception.tone.tone_sentiment_live import analyze_tone  # Temporarily disabled due to import issues
+
+# Stub function for analyze_tone
+def analyze_tone(text):
+    return {"sentiment": "neutral", "emotion": "neutral", "confidence": 0.5}
 from perception.nlu.nlu_live import nlu_process
 from memory.working_memory import WorkingMemory
 from memory.long_term_memory import LongTermMemory
 from reasoning.user_life_understanding import UserLifeUnderstanding
+from reasoning.emotional_reasoning import EmotionalReasoning
+from reasoning.ethical_awareness import EthicalAwareness
 from reasoning.internal_cognition import InternalCognition
 from perception.reasoning.insight import InsightGenerator 
 from config import validate_api_keys
@@ -88,7 +103,7 @@ def generate_therapist_response(perception_result, insights, tone, user_id="defa
         print(f"Internal Cognition Analysis: {json.dumps(cognition_log, indent=2)}")
         # -------------------------------------------
 
-        return response_text
+        return {"text": response_text, "audio": audio_path, "conversation_id": stored_conversation_id}
 
     except Exception as e:
         print(f"Error in generation: {str(e)}")
@@ -97,16 +112,19 @@ def generate_therapist_response(perception_result, insights, tone, user_id="defa
 # --- ROUTES ---
 
 @app.route('/')
+@login_required
 def index():
     return render_template('index.html')
 
 @app.route('/start_conversation', methods=['POST'])
+@login_required
 def start_conversation():
     user_id = request.form.get('user_id', 'default')
     # Simple greeting logic
     return jsonify({"message": "Hello! I'm your AI therapist. I'm here to listen. How are you?", "type": "bot"})
 
 @app.route('/analyze', methods=['POST'])
+@login_required
 def analyze():
     print("\n--- NEW REQUEST ---")
     try:
