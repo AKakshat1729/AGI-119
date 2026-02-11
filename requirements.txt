@@ -12,8 +12,13 @@ watchdog
 chromadb
 librosa
 assemblyai
-openai
 python-dotenv
 gtts
 pyttsx3
 pymongo
+fastapi
+uvicorn
+pydantic
+httpx
+groq
+ 

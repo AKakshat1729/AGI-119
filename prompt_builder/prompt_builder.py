@@ -1,103 +1,81 @@
-import tiktoken
-from typing import List, Dict, Any
+import json
 
 class PromptBuilder:
-    def __init__(self, model="gpt-3.5-turbo"):
+    def __init__(self, model="llama3-70b-8192"):
         self.model = model
-        self.encoding = tiktoken.get_encoding("cl100k_base")  # Use cl100k_base for GPT models
-        self.max_tokens = 4096  # For gpt-3.5-turbo
 
-    def count_tokens(self, text: str) -> int:
-        return len(self.encoding.encode(text))
+    def build_prompt(self, user_id, transcript, retrieved_memories, style_config, reasoning_data):
+        """
+        Converts complex JSON data into a concise text prompt to save tokens.
+        """
+        
+        # 1. THE PERSONA (System Prompt)
+        system_instruction = (
+            "You are an empathetic, professional AI therapist. "
+            "Your goal is to provide supportive, non-judgmental guidance. "
+            "Keep responses concise (under 3 sentences) unless the user asks for detail. "
+            "Do not start with 'I understand' every time. Be natural."
+        )
 
-    def truncate_text(self, text: str, max_tokens: int) -> str:
-        tokens = self.encoding.encode(text)
-        if len(tokens) > max_tokens:
-            tokens = tokens[:max_tokens]
-            text = self.encoding.decode(tokens)
-        return text
+        # 2. THE CONTEXT (Dynamic Construction)
+        context_block = ""
 
-    def build_prompt(self, user_id: str, current_message: str, retrieved_bundle: Dict[str, Any], style_config: Dict[str, Any], reasoning_data: Dict[str, Any] = None) -> Dict[str, Any]:
-        if reasoning_data is None:
-            reasoning_data = {}
-        style = style_config.get('style', 'medium')  # short, medium, long
-        therapeutic = style_config.get('therapeutic', True)
+        # A. Emotional State (From Perception)
+        # We assume reasoning_data might contain the tone/emotion analysis
+        current_emotion = "neutral"
+        if reasoning_data and 'therapeutic_insight' in reasoning_data:
+             # Extract emotion if hidden in insight, or pass it explicitly if you change app.py
+             pass 
 
-        # System prompt
-        system_prompt = """
-You are a compassionate AI therapist assistant. Provide empathetic, non-judgmental support.
-If the user shows signs of crisis, encourage professional help.
-Do not diagnose or prescribe.
-"""
+        # B. Relevant History (From Memory)
+        # retrieved_memories is usually a dict with 'top_memories' list
+        history_text = ""
+        if retrieved_memories and 'top_memories' in retrieved_memories:
+            memories = retrieved_memories['top_memories']
+            if memories:
+                history_text = "Relevant Past Context:\n"
+                for mem in memories[:3]: # Limit to top 3 to save tokens
+                    # If memory is a dict, get 'text', else use string
+                    val = mem.get('text') if isinstance(mem, dict) else str(mem)
+                    history_text += f"- {val}\n"
 
-        if therapeutic:
-            system_prompt += " Respond in a therapeutic manner."
-
-        # Profile summary
-        profile = retrieved_bundle.get('profile_summary', '')
-        profile_section = f"User Profile Summary:\n{profile}\n\n" if profile else ""
-
-        # Episodic memories
-        top_memories = retrieved_bundle.get('top_memories', [])
-        episodic_section = "Relevant Past Memories:\n"
-        for mem in top_memories:
-            episodic_section += f"- {mem['text']}\n"
-        episodic_section += "\n"
-
-        # Risk flags
-        risk_flags = retrieved_bundle.get('risk_flags', [])
-        risk_section = ""
-        if risk_flags:
-            risk_section = "Risk Flags: " + ", ".join(risk_flags) + ". Handle with care.\n\n"
-
-        # Reasoning insights
-        reasoning_section = ""
+        # C. Deep Insight (From Reasoning)
+        insight_text = ""
         if reasoning_data:
-            life_story = reasoning_data.get('life_story', '')
-            if life_story:
-                reasoning_section += f"User Life Story Summary:\n{life_story}\n\n"
-            emotional_progress = reasoning_data.get('emotional_progress', {})
-            if emotional_progress:
-                progress = emotional_progress.get('progress', 'stable')
-                reasoning_section += f"Emotional Progress: {progress}\n\n"
-            recurring_problems = reasoning_data.get('recurring_problems', [])
-            if recurring_problems:
-                problems = ", ".join([p[0] for p in recurring_problems[:5]])
-                reasoning_section += f"Recurring Problems: {problems}\n\n"
-            therapeutic_insight = reasoning_data.get('therapeutic_insight', {})
-            if therapeutic_insight:
-                insight = therapeutic_insight.get('insight', '')
-                if insight:
-                    reasoning_section += f"Therapeutic Insight: {insight}\n\n"
+            # Check for life story facts
+            life_story = reasoning_data.get('life_story', {})
+            if life_story and 'potential_facts' in life_story:
+                facts = life_story['potential_facts']
+                if facts:
+                    insight_text += f"User Facts: {', '.join(facts[:3])}.\n"
+            
+            # Check for therapeutic insight
+            if 'therapeutic_insight' in reasoning_data:
+                insight_text += f"Therapeutic Note: {reasoning_data['therapeutic_insight']}\n"
 
-        # Current message
-        user_message = f"User: {current_message}\n"
+        # 3. ASSEMBLE THE FINAL PROMPT
+        # We format it as a list of messages for the Chat API
+        
+        user_message_content = f"""
+        {insight_text}
+        {history_text}
+        
+        User's Current Input: "{transcript}"
+        
+        Respond to the user now, incorporating the context above naturally.
+        """
 
-        # Combine
-        full_prompt = system_prompt + "\n\n" + profile_section + episodic_section + risk_section + reasoning_section + user_message
+        # Clean up extra whitespace
+        user_message_content = "\n".join([line.strip() for line in user_message_content.split('\n') if line.strip()])
 
-        # Token budgeting
-        token_count = self.count_tokens(full_prompt)
-        if token_count > self.max_tokens - 200:  # Reserve for response
-            # Truncate episodic section
-            max_episodic_tokens = self.max_tokens - 200 - self.count_tokens(system_prompt + profile_section + risk_section + reasoning_section + user_message)
-            episodic_text = "\n".join([f"- {mem['text']}" for mem in top_memories])
-            episodic_text = self.truncate_text(episodic_text, max_episodic_tokens)
-            episodic_section = "Relevant Past Memories:\n" + episodic_text + "\n"
-            full_prompt = system_prompt + "\n\n" + profile_section + episodic_section + risk_section + reasoning_section + user_message
-            token_count = self.count_tokens(full_prompt)
-
-        # Messages for LLM
         messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": profile_section + episodic_section + risk_section + reasoning_section + user_message}
+            {"role": "system", "content": system_instruction},
+            {"role": "user", "content": user_message_content}
         ]
 
-        # Debug
-        debug_prompt_text = full_prompt
-
+        # Return the payload expected by your app.py
         return {
+            "model": self.model,
             "messages": messages,
-            "debug_prompt_text": debug_prompt_text,
-            "token_count": token_count
+            "token_count": len(user_message_content) // 4 # Rough estimate
         }

@@ -59,7 +59,7 @@ class ServerMemoryStore:
                 embeddings=[embedding],
                 ids=[memory_id]
             )
-        elif memory_type == "conversation":
+        elif memory_type == "conversation" and self.conversation_logs_collection is not None:
             self.conversation_logs_collection.add(
                 documents=[text],
                 metadatas=[metadata],
@@ -197,9 +197,11 @@ class ServerMemoryStore:
                 self.episodic_collection.delete(ids=episodic_results['ids'])
 
             # Delete from conversation logs collection
-            conversation_results = self.conversation_logs_collection.get(where={"user_id": user_id})
-            if conversation_results['ids']:
-                self.conversation_logs_collection.delete(ids=conversation_results['ids'])
+            # Collections are guaranteed to exist after initialization
+            if self.conversation_logs_collection is not None:
+                conversation_results = self.conversation_logs_collection.get(where={"user_id": user_id})
+                if conversation_results and conversation_results.get('ids'):
+                    self.conversation_logs_collection.delete(ids=conversation_results['ids'])
 
             return True
         except Exception as e:

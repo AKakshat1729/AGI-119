@@ -45,12 +45,14 @@
 
       .sidebar {
         width: 280px;
+        min-width: 70px;
         background: #f8f9fa;
         border-right: 1px solid #e9ecef;
         display: flex;
         flex-direction: column;
-        transition: all 0.3s ease;
+        transition: width 280ms cubic-bezier(.4,0,.2,1), border-color 200ms;
         position: relative;
+        overflow: hidden;
       }
 
       body.dark-mode .sidebar {
@@ -59,21 +61,50 @@
       }
 
       .sidebar.collapsed {
-        width: 70px;
+        width: 100px;
       }
 
-      .sidebar.collapsed:hover {
-        width: 280px;
+      /* Content inside the sidebar will fade/slide instead of toggling display */
+      .sidebar .user-info,
+      .sidebar .menu-text,
+      .sidebar .section-title,
+      .chat-preview,
+      .chat-timestamp {
+        transition: opacity 200ms ease, transform 200ms ease, max-width 200ms ease;
+        will-change: opacity, transform, max-width;
       }
 
-      .sidebar.collapsed:hover .user-info,
-      .sidebar.collapsed:hover .menu-text,
-      .sidebar.collapsed:hover .section-title {
-        display: block;
+      .sidebar.collapsed .user-info,
+      .sidebar.collapsed .menu-text,
+      .sidebar.collapsed .section-title,
+      .sidebar.collapsed .chat-preview,
+      .sidebar.collapsed .chat-timestamp {
+        opacity: 0;
+        transform: translateX(-8px);
+        max-width: 0;
+        pointer-events: none;
       }
 
-      .sidebar.collapsed:hover .avatar {
-        margin-right: 12px;
+      /* Keep avatar visible and centered when collapsed */
+      .sidebar.collapsed .avatar {
+        margin-right: 0;
+      }
+
+      /* Hover to temporarily expand for quick peek (desktop only) */
+      @media (min-width: 769px) {
+        .sidebar.collapsed:hover {
+          width: 280px;
+        }
+        .sidebar.collapsed:hover .user-info,
+        .sidebar.collapsed:hover .menu-text,
+        .sidebar.collapsed:hover .section-title,
+        .sidebar.collapsed:hover .chat-preview,
+        .sidebar.collapsed:hover .chat-timestamp {
+          opacity: 1;
+          transform: translateX(0);
+          max-width: 400px;
+          pointer-events: auto;
+        }
       }
 
       .sidebar-header {
@@ -410,6 +441,10 @@
         color: white;
         margin-right: auto;
         border-bottom-left-radius: 5px;
+      }
+
+      .message.bot.error-message {
+        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
       }
 
       .message.user {
@@ -1121,7 +1156,30 @@
           const result = await response.json();
 
           if (result.error) {
-            addMessage("Sorry, I encountered an error: " + result.error, "bot");
+            // Handle specific error types
+            const errorMessage = result.error.toLowerCase();
+            
+              if (errorMessage.includes('quota') || errorMessage.includes('quota exceeded')) {
+              addErrorMessage(
+                "🔴 API Quota Exceeded",
+                "Your API quota has been exceeded. Please update your Groq token in Settings.",
+                "quota-error"
+              );
+            } else if (errorMessage.includes('invalid api key') || errorMessage.includes('unauthorized')) {
+              addErrorMessage(
+                "🔴 Invalid API Key",
+                "There's an issue with your Groq token. Please update it in Settings.",
+                "key-error"
+              );
+            } else if (errorMessage.includes('rate limit')) {
+              addErrorMessage(
+                "⏱️ Rate Limited",
+                "Too many requests. Please wait a moment and try again.",
+                "rate-limit"
+              );
+            } else {
+              addMessage("Sorry, I encountered an error: " + result.error, "bot");
+            }
           } else {
             // If audio, show transcription
             if (data.audio && result.transcript) {
@@ -1156,6 +1214,27 @@
           messageDiv.appendChild(audio);
         }
         chatMessages.appendChild(messageDiv);
+        chatMessages.scrollTop = chatMessages.scrollHeight;
+      }
+
+      function addErrorMessage(title, message, errorType) {
+        const errorDiv = document.createElement("div");
+        errorDiv.className = `message bot error-message error-${errorType}`;
+        errorDiv.innerHTML = `
+          <div style="font-weight: bold; margin-bottom: 8px;">${title}</div>
+          <div style="font-size: 0.95em; line-height: 1.5;">${message}</div>
+          <button onclick="window.location.href = '/settings'" style="
+            margin-top: 12px;
+            padding: 8px 16px;
+            background: rgba(255,255,255,0.2);
+            border: 1px solid rgba(255,255,255,0.4);
+            color: white;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 0.9em;
+          ">Go to Settings →</button>
+        `;
+        chatMessages.appendChild(errorDiv);
         chatMessages.scrollTop = chatMessages.scrollHeight;
       }
 

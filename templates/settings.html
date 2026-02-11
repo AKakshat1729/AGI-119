@@ -5,10 +5,167 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings - AGI-119</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        :root { --accent-color: #667eea; }
+        /* Dark Mode Support */
+        body.dark-mode {
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .container {
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .card {
+            background: #2d2d2d;
+            border-color: #404040;
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .card-header {
+            background: #1a1a1a;
+            border-bottom-color: #404040;
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .form-label {
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .form-control,
+        body.dark-mode .form-select {
+            background: #3d3d3d;
+            border-color: #555;
+            color: #e0e0e0;
+        }
+
+        body.dark-mode .form-control:focus,
+        body.dark-mode .form-select:focus {
+            background: #3d3d3d;
+            border-color: var(--accent-color);
+            color: #e0e0e0;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.18);
+        }
+
+        body.dark-mode .btn-outline-secondary {
+            color: #e0e0e0;
+            border-color: #555;
+        }
+
+        body.dark-mode .btn-outline-secondary:hover {
+            background: #555;
+            border-color: #555;
+        }
+
+        body.dark-mode .form-check-input {
+            background: #3d3d3d;
+            border-color: #555;
+        }
+
+        body.dark-mode .form-check-input:checked {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+
+        body.dark-mode .alert-info {
+            background: #1a4d6d;
+            border-color: #2e7d99;
+            color: #a8d5e2;
+        }
+
+        body.dark-mode .alert-info a {
+            color: #82b8d1;
+            text-decoration: underline;
+        }
+
+        body.dark-mode .text-muted {
+            color: #999 !important;
+        }
+
+        body.dark-mode .btn-secondary {
+            background: #555;
+            border-color: #555;
+        }
+
+        body.dark-mode .btn-secondary:hover {
+            background: #666;
+            border-color: #666;
+        }
+        .btn-primary {
+            background: var(--accent-color);
+            border-color: var(--accent-color);
+        }
+        .btn-primary:hover {
+            background: color-mix(in srgb, var(--accent-color) 80%, black 20%);
+            border-color: color-mix(in srgb, var(--accent-color) 80%, black 20%);
+        }
+
+        .api-key-input {
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            letter-spacing: 0.05em;
+        }
+        .api-key-status {
+            font-size: 0.9rem;
+            margin-top: 0.5rem;
+        }
+        .api-key-status.valid {
+            color: #28a745;
+        }
+        .api-key-status.invalid {
+            color: #dc3545;
+        }
+        .api-key-status.validating {
+            color: #ffc107;
+        }
+        .api-error-box {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            border-radius: 0.25rem;
+            padding: 0.75rem 1.25rem;
+            margin-bottom: 1rem;
+            color: #721c24;
+        }
+        .api-success-box {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            border-radius: 0.25rem;
+            padding: 0.75rem 1.25rem;
+            margin-bottom: 1rem;
+            color: #155724;
+        }
+
+        /* Dark mode for error/success boxes */
+        body.dark-mode .api-error-box {
+            background-color: #5d2e2e;
+            border-color: #8b4545;
+            color: #ff9999;
+        }
+
+        body.dark-mode .api-success-box {
+            background-color: #2e5d3d;
+            border-color: #458b65;
+            color: #99ff99;
+        }
+
+        .settings-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 30px;
+        }
+        .spinner-border-sm {
+            width: 1rem;
+            height: 1rem;
+        }
+    </style>
 </head>
 <body>
     <div class="container mt-5">
-        <h2>Settings</h2>
+        <div class="settings-header">
+            <h2 class="mb-0">Settings</h2>
+        </div>
         {% with messages = get_flashed_messages() %}
             {% if messages %}
                 {% for message in messages %}
@@ -17,18 +174,53 @@
             {% endif %}
         {% endwith %}
 
-        <!-- API Settings -->
+        <!-- Groq Token Settings -->
         <div class="card mb-4">
             <div class="card-header">
-                <h5 class="mb-0">API Configuration</h5>
+                <h5 class="mb-0">Groq Configuration</h5>
             </div>
             <div class="card-body">
-                <form method="POST" action="/settings/api">
+                <div class="alert alert-info" role="alert">
+                    <strong>Note:</strong> Use a Groq API token only.
+                    Get your token from <a href="https://console.groq.com/keys" target="_blank">Groq</a>.
+                </div>
+
+                <form id="apiKeyForm" onsubmit="handleApiKeySubmit(event)">
+                    <!-- Token Input -->
                     <div class="mb-3">
-                        <label for="api_key" class="form-label">LLM API Key</label>
-                        <input type="password" class="form-control" id="api_key" name="api_key" placeholder="{{ current_key }}" required>
+                        <label for="groqApiToken" class="form-label">Groq API Token</label>
+                        <div class="input-group">
+                            <input 
+                                type="password" 
+                                class="form-control api-key-input" 
+                                id="groqApiToken" 
+                                name="groq_api_token"
+                                placeholder="Paste your Groq API token here"
+                                autocomplete="off"
+                            >
+                            <button 
+                                class="btn btn-outline-secondary" 
+                                type="button" 
+                                id="toggleApiKeyVisibility"
+                                onclick="toggleApiKeyVisibility()"
+                            >
+                                👁️
+                            </button>
+                        </div>
+                        <small class="form-text text-muted">Your token is stored in session for convenience; server env takes precedence.</small>
                     </div>
-                    <button type="submit" class="btn btn-primary">Update API Key</button>
+
+                    <div id="apiKeyStatus" class="api-key-status" style="display: none;"></div>
+                    <div id="apiKeyMessage" class="mt-2" style="display: none;"></div>
+
+                    <div class="mb-3">
+                        <button type="button" class="btn btn-outline-primary me-2" onclick="validateApiKey()">
+                            Validate Token
+                        </button>
+                        <button type="submit" class="btn btn-primary" id="saveApiKeyBtn">
+                            Save Token
+                        </button>
+                    </div>
                 </form>
             </div>
         </div>
@@ -54,6 +246,17 @@
                                 Dark Mode
                             </label>
                         </div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Theme Color</label>
+                        <div class="d-flex align-items-center">
+                            <input type="color" id="themeColor" name="theme_color" value="{{ (user_settings or {}).get('theme_color', '#667eea') }}" class="form-control form-control-color me-3" style="width:70px; padding:0;">
+                            <div id="colorPreview"
+                                 style="width:36px;height:36px;border-radius:6px;border:1px solid #ccc"
+                                 data-initial-color="{{ user_settings.theme_color if user_settings else '#667eea' }}">
+                            </div>
+                        </div>
+                        <small class="form-text text-muted">Pick the primary theme color used for accents.</small>
                     </div>
                     <button type="submit" class="btn btn-primary">Save Theme</button>
                 </form>
@@ -110,6 +313,155 @@
     </div>
 
     <script>
+        let apiKeyValidationInProgress = false;
+
+        // Apply server-side theme preference on load and react to changes
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initial apply based on the radio state (rendered by server)
+            const darkRadio = document.getElementById('dark');
+            const lightRadio = document.getElementById('light');
+            if (darkRadio && darkRadio.checked) {
+                document.body.classList.add('dark-mode');
+            } else {
+                document.body.classList.remove('dark-mode');
+            }
+
+            // Apply theme color
+            const themeColorInput = document.getElementById('themeColor');
+            if (themeColorInput) {
+                document.body.style.setProperty('--accent-color', themeColorInput.value || '#667eea');
+                const preview = document.getElementById('colorPreview');
+                if (preview) preview.style.background = themeColorInput.value;
+                themeColorInput.addEventListener('input', function() {
+                    document.body.style.setProperty('--accent-color', this.value);
+                    if (preview) preview.style.background = this.value;
+                });
+            }
+
+            // When the user toggles theme radios, apply immediately
+            if (darkRadio) {
+                darkRadio.addEventListener('change', function() {
+                    if (this.checked) document.body.classList.add('dark-mode');
+                });
+            }
+            if (lightRadio) {
+                lightRadio.addEventListener('change', function() {
+                    if (this.checked) document.body.classList.remove('dark-mode');
+                });
+            }
+        });
+
+        function toggleApiKeyVisibility() {
+            const keyInput = document.getElementById('groqApiToken');
+            const btn = document.getElementById('toggleApiKeyVisibility');
+
+            if (!keyInput) return;
+            if (keyInput.type === 'password') {
+                keyInput.type = 'text';
+                btn.textContent = '🙈';
+            } else {
+                keyInput.type = 'password';
+                btn.textContent = '👁️';
+            }
+        }
+
+        async function validateApiKey() {
+            const apiKeyInput = document.getElementById('groqApiToken');
+            const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
+            const statusDiv = document.getElementById('apiKeyStatus');
+            const messageDiv = document.getElementById('apiKeyMessage');
+
+            if (!apiKey) {
+                statusDiv.style.display = 'block';
+                statusDiv.className = 'api-key-status invalid';
+                statusDiv.textContent = '⚠️ Please enter an API key';
+                return;
+            }
+
+            apiKeyValidationInProgress = true;
+            statusDiv.style.display = 'block';
+            statusDiv.className = 'api-key-status validating';
+            statusDiv.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Validating...';
+
+            try {
+                const response = await fetch('/api/validate-groq-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ api_key: apiKey })
+                });
+
+                const data = await response.json();
+
+                if (data.valid) {
+                    statusDiv.className = 'api-key-status valid';
+                    statusDiv.textContent = '✓ Token is valid';
+                    messageDiv.style.display = 'block';
+                    messageDiv.className = 'api-success-box';
+                    messageDiv.textContent = 'Your API key is working correctly!';
+                } else {
+                    statusDiv.className = 'api-key-status invalid';
+                    statusDiv.textContent = '✗ Invalid token';
+                    messageDiv.style.display = 'block';
+                    messageDiv.className = 'api-error-box';
+                    messageDiv.textContent = data.message || 'The API key is invalid. Please check and try again.';
+                }
+            } catch (error) {
+                statusDiv.className = 'api-key-status invalid';
+                statusDiv.textContent = '✗ Validation failed';
+                messageDiv.style.display = 'block';
+                messageDiv.className = 'api-error-box';
+                messageDiv.textContent = 'Error validating API key: ' + error.message;
+            } finally {
+                apiKeyValidationInProgress = false;
+            }
+        }
+
+        async function handleApiKeySubmit(event) {
+            event.preventDefault();
+            
+            const apiKeyInput = document.getElementById('groqApiToken');
+            const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
+            const messageDiv = document.getElementById('apiKeyMessage');
+
+            if (!apiKey) {
+                messageDiv.style.display = 'block';
+                messageDiv.className = 'api-error-box';
+                messageDiv.textContent = '⚠️ Please enter an API key';
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/save-groq-token', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    credentials: 'include',
+                    body: JSON.stringify({ api_key: apiKey })
+                });
+
+                const data = await response.json();
+
+                messageDiv.style.display = 'block';
+                if (data.success) {
+                    messageDiv.className = 'api-success-box';
+                    messageDiv.textContent = '✓ API key saved successfully!';
+                    setTimeout(() => {
+                        if (apiKeyInput) apiKeyInput.value = '';
+                    }, 1000);
+                } else {
+                    messageDiv.className = 'api-error-box';
+                    messageDiv.textContent = '✗ Error saving API key: ' + (data.message || 'Unknown error');
+                }
+            } catch (error) {
+                messageDiv.style.display = 'block';
+                messageDiv.className = 'api-error-box';
+                messageDiv.textContent = 'Error saving API key: ' + error.message;
+            }
+        }
+
         function confirmDataDeletion() {
             if (confirm('Are you sure you want to delete all your conversation data? This action cannot be undone.')) {
                 fetch('/settings/delete_data', {
@@ -128,6 +480,16 @@
                     alert('Error deleting data: ' + error.message);
                 });
             }
+        }
+
+        // Auto-validate token on paste
+        const pasteEl = document.getElementById('groqApiToken');
+        if (pasteEl) {
+            pasteEl.addEventListener('paste', function() {
+                setTimeout(() => {
+                    validateApiKey();
+                }, 100);
+            });
         }
     </script>
 </body>
