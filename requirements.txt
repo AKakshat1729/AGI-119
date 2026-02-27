@@ -1,27 +1,40 @@
-websockets
-sounddevice
-textblob
-nltk
-numpy
+# --- Core Web & API Framework ---
 flask
 flask-login
 flask-cors
-aiohttp
-requests
-watchdog
-chromadb
-librosa
-assemblyai
-python-dotenv
-gtts
-pyttsx3
-pymongo
 fastapi
 uvicorn
 pydantic
+aiohttp
+requests
 httpx
-google-generativeai
+websockets
 Markupsafe>=2.1.3
 Werkzeug>=2.3.7
+
+# --- AI & Large Language Models ---
+google-generativeai
 sentence_transformers
+transformers
+
+# --- Databases & Memory ---
+pymongo
+dnspython            # Required for MongoDB Atlas +srv connections
+chromadb
+
+# --- Audio & Speech Processing ---
+assemblyai
+pyaudio              # Required for AssemblyAI real-time microphone stream
+sounddevice
+librosa
+gtts
+pyttsx3
+
+# --- Data Science & Utilities ---
+numpy
 pandas
+scikit-learn         # Essential for vector calculations/clustering
+textblob
+nltk
+python-dotenv
+watchdog
