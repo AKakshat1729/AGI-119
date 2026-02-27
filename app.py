@@ -312,7 +312,12 @@ def retrieve_working_memory(user_id, conversation_id):
     try:
         working_mem = WorkingMemory(f"working_memory_{conversation_id}")
         all_messages = working_mem.collection.get()
-        return {"messages": all_messages.get("documents", []), "count": len(all_messages.get("documents", []))}
+        
+        # This guarantees it will be a list, even if the DB explicitly returns None
+        documents = all_messages.get("documents") or []
+        
+        return {"messages": documents, "count": len(documents)}
+        
     except Exception as e:
         print(f"[WARNING] Error retrieving working memory: {e}")
         return {"messages": [], "count": 0}
@@ -455,27 +460,6 @@ def _update_env_variable(key: str, value: str, env_path='.env'):
         return False
 
 
-def get_user_settings(user_id: str):
-    try:
-        default = get_default_settings()
-        if mongo_connected and users_collection is not None:
-            doc = users_collection.find_one({"email": user_id})
-            if doc and 'settings' in doc:
-                settings = doc['settings']
-                merged = default.copy()
-                merged.update(settings)
-                return merged
-        else:
-            # Fallback to local dict
-            u = users.get(user_id)
-            if u and hasattr(u, 'settings'):
-                merged = default.copy()
-                merged.update(u.settings)
-                return merged
-        return default
-    except Exception as e:
-        print(f"Error getting user settings: {e}")
-        return get_default_settings()
 
 def update_user_settings(user_id: str, settings_update: dict):
     """Update settings for a user in MongoDB or local storage"""
@@ -714,57 +698,86 @@ def api_chat_stats():
     if not current_user.is_authenticated:
         return jsonify({"success": False, "message": "Authentication required"}), 401
     try:
-        conversations = memory_store.get_conversation_history(current_user.id, limit=1000)
+        # Guarantee we get a list back, never None
+        conversations = memory_store.get_conversation_history(current_user.id, limit=1000) or []
         total = len(conversations)
+        
         user_msgs = sum(1 for c in conversations if c.get('text', '').startswith('User:'))
         ai_msgs = sum(1 for c in conversations if c.get('text', '').startswith('AI:'))
+        
         # Rough avg per day
         avg_daily = 0
         if conversations:
-            dates = [datetime.fromisoformat(c.get('timestamp')) for c in conversations if c.get('timestamp')]
+            # [FIX] Explicitly cast to string so fromisoformat is 100% safe
+            dates = [datetime.fromisoformat(str(c.get('timestamp'))) for c in conversations if c.get('timestamp')]
+            
             if dates:
                 span_days = max(1, (datetime.now() - min(dates)).days)
                 avg_daily = total / span_days
 
-        return jsonify({"success": True, "total_messages": total, "user_messages": user_msgs, "ai_messages": ai_msgs, "avg_daily": avg_daily})
+        return jsonify({
+            "success": True, 
+            "total_messages": total, 
+            "user_messages": user_msgs, 
+            "ai_messages": ai_msgs, 
+            "avg_daily": avg_daily
+        })
     except Exception as e:
         print(f"Error /api/analytics/chat-stats: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
-
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        email = request.form.get('email', '').strip().lower()
-        password = request.form.get('password', '')
+        # Safely extract form data (guaranteeing they are strings)
+        raw_email = request.form.get('email')
+        raw_password = request.form.get('password')
+        
+        email = str(raw_email).strip().lower() if raw_email else ''
+        password = str(raw_password) if raw_password else ''
         
         try:
-            user_data = None
+            user_dict = None
+            
+            # 1. Try connecting to MongoDB first
             if mongo_connected and users_collection is not None:
-                user_data = users_collection.find_one({"email": email})
-            else:
-                user_data = users.get(email) # Check in-memory
-                # Since 'users' stores User objects, we need to extract dict data if simulating DB
-                if user_data: 
-                     user_data = {'email': user_data.email, 'name': user_data.name, 'password': user_data.password}
-                
-            if not user_data:
+                doc = users_collection.find_one({"email": email})
+                if doc and isinstance(doc, dict):
+                    user_dict = doc
+                    
+            # 2. Fallback to in-memory dictionary if Mongo fails/is empty
+            if not user_dict:
+                local_user = users.get(email)
+                if local_user:
+                    user_dict = {
+                        'email': getattr(local_user, 'email', email),
+                        'name': getattr(local_user, 'name', email),
+                        'password': getattr(local_user, 'password', '')
+                    }
+            
+            # 3. If still nothing, the account doesn't exist
+            if not user_dict:
                 flash('Account not found')
                 return render_template('login.html')
                 
-            if check_password_hash(user_data['password'], password):
+            # 4. Safely extract the hashed password
+            stored_password = user_dict.get('password') or ""
+            
+            # 5. Verify password and log the user in
+            if check_password_hash(stored_password, password):
                 user = User(
-                    user_id=user_data['email'],
-                    name=user_data.get('name', user_data['email']),
-                    email=user_data['email'],
-                    password_hash=user_data['password']
+                    user_id=user_dict.get('email', email),
+                    name=user_dict.get('name', email),
+                    email=user_dict.get('email', email),
+                    password_hash=stored_password
                 )
                 login_user(user)
                 return redirect(url_for('index'))
             else:
                 flash('Invalid password')
+                
         except Exception as e:
-            print(f"Login error: {e}")
+            print(f"[ERROR] Login error: {e}")
             flash('Login service unavailable - try again later')
             
     return render_template('login.html')
@@ -915,7 +928,7 @@ def analyze():
                     "conversation_edit",
                     f"Edit (ref_id={edit_id}): {transcript}",
                     tags=["conversation", "edit", f"conv_{conversation_id}"],
-                    conversation_id=conversation_id,
+                    conversation_id=str(conversation_id or "default_session"),
                     importance=0.5
                 )
             except Exception as e:
@@ -1046,9 +1059,9 @@ def build_enhanced_prompt_with_perception(transcript, perception_data, reasoning
         
         return combined_context + clinical_context
     
-    except Exception as e:
-        print(f"[WARNING] Error building enhanced prompt: {str(e)}")
-        return ""
+    except Exception as e: # type: ignore
+            print(f"[WARNING] Error building enhanced prompt: {str(e)}")
+            return ""
 
 def generate_response_data(perception_data, user_id, transcript, conversation_id=None):
     """Generate response using Gemini API with clinical integration"""
@@ -1061,7 +1074,7 @@ def generate_response_data(perception_data, user_id, transcript, conversation_id
         
         # [MEMORY FIX] Store User message in working memory immediately
         if conversation_id and transcript:
-            store_working_memory(user_id, f"User: {transcript}", conversation_id)
+            store_working_memory(user_id, f"User: {transcript}", str(conversation_id))
 
         # Get message history for context
         message_history = []
@@ -1071,8 +1084,8 @@ def generate_response_data(perception_data, user_id, transcript, conversation_id
             try:
                 working_mem = WorkingMemory(f"working_memory_{conversation_id}")
                 
-                # 1. Sequential History
-                sorted_messages = working_mem.get_all_sorted()
+                # 1. Sequential History (Pylance safe: guarantees a list, avoiding NoneType slice error)
+                sorted_messages = working_mem.get_all_sorted() or []
 
                 # Build sequential history — last 8 messages only to limit tokens
                 for msg in sorted_messages[-8:]:  
@@ -1081,22 +1094,29 @@ def generate_response_data(perception_data, user_id, transcript, conversation_id
                             try:
                                 import ast
                                 dict_msg = ast.literal_eval(msg)
-                                msg = dict_msg.get('message', '')
-                            except: pass
-                            
+                                msg = str(dict_msg.get('message', ''))
+                            except Exception: 
+                                pass
+                                
                         if msg.startswith("User:"):
                             message_history.append({"role": "user", "content": msg[5:].strip()})
                         elif msg.startswith("Assistant:"):
                             message_history.append({"role": "assistant", "content": msg[10:].strip()})
                             
                 # 2. Semantic retrieval — 2 results, capped at 80 chars each
-                relevant_docs = working_mem.retrieve(query=transcript, n_results=2)
-                if relevant_docs and relevant_docs.get('documents'):
-                    for doc_list in relevant_docs['documents']:
-                        for doc in doc_list:
-                             is_in_history = any(doc in m['content'] for m in message_history)
-                             if not is_in_history and len(doc) > 10:
-                                 smart_context.append(doc[:80])  # cap each snippet
+                # Pylance safe: default to empty dict if retrieve fails
+                relevant_docs = working_mem.retrieve(query=str(transcript or ""), n_results=2) or {}
+                
+                # Pylance safe: extract documents safely, default to empty list if None
+                doc_lists = relevant_docs.get('documents') or []
+                
+                for doc_list in doc_lists:
+                    # Pylance safe: ensure the inner list is also iterable
+                    for doc in (doc_list or []):
+                        doc_str = str(doc)
+                        is_in_history = any(doc_str in m.get('content', '') for m in message_history)
+                        if not is_in_history and len(doc_str) > 10:
+                            smart_context.append(doc_str[:80])  # cap each snippet
 
             except Exception as e:
                 print(f"[WARNING] Could not load message history: {e}")
@@ -1258,7 +1278,7 @@ def generate_response_data(perception_data, user_id, transcript, conversation_id
         
         # [QUOTA SAVER] Pass None as llm_client so only LOCAL extraction runs (no extra API call)
         current_exchange = f"User: {transcript}\nAI: {response_text}"
-        pers_memory.extract_and_save_async(user_id, current_exchange, None, api_key=None)
+        pers_memory.extract_and_save_async(user_id, current_exchange, None, api_key=str(os.environ.get("GEMINI_API_KEY") or ""))
 
         # [CLINICAL INTELLIGENCE] Async session analytics (emotion + themes + safety)
         try:
@@ -1390,9 +1410,7 @@ def get_conversations():
         print(f"Error fetching conversations: {e}")
         return jsonify({"success": False, "conversations": [], "message": str(e)}), 500
             
-    except Exception as e:
-        print(f"Error in get_conversations: {e}")
-        return jsonify({"success": False, "message": str(e)}), 500
+
 
 @app.route('/api/conversation/<conversation_id>', methods=['GET'])
 @login_required
@@ -1424,9 +1442,6 @@ def get_conversation_detail(conversation_id):
         print(f"Error fetching conversation detail: {e}")
         return jsonify({"success": False, "messages": [], "message": str(e)}), 500
             
-    except Exception as e:
-        print(f"Error in get_conversation_detail: {e}")
-        return jsonify({"success": False, "message": str(e)}), 500
 
 @app.route('/api/save-conversation-with-name', methods=['POST'])
 @login_required
@@ -1701,7 +1716,7 @@ def api_sync_history():
             try:
                 from utils.llm_client import generate_chat_response
                 api_key = session.get('gemini_api_key') or os.environ.get("GEMINI_API_KEY")
-                pers_memory.analyze_historical_data(user_id, all_convos, generate_chat_response, api_key=api_key)
+                pers_memory.analyze_historical_data(user_id, all_convos, generate_chat_response, api_key=str(os.environ.get("GEMINI_API_KEY") or ""))
             except Exception as e:
                 print(f"[MEMORY SYNC ERROR] {e}")
 
