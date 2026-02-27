@@ -1,1250 +1,819 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>AI Therapist Chatbot</title>
-    <style>
-      * {
-        margin: 0;
-        padding: 0;
-        box-sizing: border-box;
-      }
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGI-119 | AGITherapist</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css?v=4">
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.2/purify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
 
-      body {
-        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        min-height: 100vh;
-        display: flex;
-        justify-content: center;
-        align-items: center;
-        margin: 0;
-        transition: background-color 0.3s ease;
-      }
-
-      body.dark-mode {
-        background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-        color: white;
-      }
-
-      .app-container {
-        width: 100%;
-        max-width: 1200px;
-        height: 90vh;
-        background: white;
-        border-radius: 20px;
-        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
-        display: flex;
-        overflow: hidden;
-        transition: background-color 0.3s ease;
-      }
-
-      body.dark-mode * {
-        color: inherit;
-      }
-
-      .sidebar {
-        width: 280px;
-        min-width: 70px;
-        background: #f8f9fa;
-        border-right: 1px solid #e9ecef;
-        display: flex;
-        flex-direction: column;
-        transition: width 280ms cubic-bezier(.4,0,.2,1), border-color 200ms;
-        position: relative;
-        overflow: hidden;
-      }
-
-      body.dark-mode .sidebar {
-        background: #2d2d2d;
-        border-right: 1px solid #404040;
-      }
-
-      .sidebar.collapsed {
-        width: 100px;
-      }
-
-      /* Content inside the sidebar will fade/slide instead of toggling display */
-      .sidebar .user-info,
-      .sidebar .menu-text,
-      .sidebar .section-title,
-      .chat-preview,
-      .chat-timestamp {
-        transition: opacity 200ms ease, transform 200ms ease, max-width 200ms ease;
-        will-change: opacity, transform, max-width;
-      }
-
-      .sidebar.collapsed .user-info,
-      .sidebar.collapsed .menu-text,
-      .sidebar.collapsed .section-title,
-      .sidebar.collapsed .chat-preview,
-      .sidebar.collapsed .chat-timestamp {
-        opacity: 0;
-        transform: translateX(-8px);
-        max-width: 0;
-        pointer-events: none;
-      }
-
-      /* Keep avatar visible and centered when collapsed */
-      .sidebar.collapsed .avatar {
-        margin-right: 0;
-      }
-
-      /* Hover to temporarily expand for quick peek (desktop only) */
-      @media (min-width: 769px) {
-        .sidebar.collapsed:hover {
-          width: 280px;
-        }
-        .sidebar.collapsed:hover .user-info,
-        .sidebar.collapsed:hover .menu-text,
-        .sidebar.collapsed:hover .section-title,
-        .sidebar.collapsed:hover .chat-preview,
-        .sidebar.collapsed:hover .chat-timestamp {
-          opacity: 1;
-          transform: translateX(0);
-          max-width: 400px;
-          pointer-events: auto;
-        }
-      }
-
-      .sidebar-header {
-        padding: 20px;
-        border-bottom: 1px solid #e9ecef;
-        display: flex;
-        justify-content: flex-end;
-      }
-
-      body.dark-mode .sidebar-header {
-        border-bottom: 1px solid #404040;
-      }
-
-      .sidebar-toggle {
-        background: none;
-        border: none;
-        font-size: 20px;
-        cursor: pointer;
-        padding: 5px;
-        border-radius: 5px;
-        transition: background-color 0.2s;
-      }
-
-      .sidebar-toggle:hover {
-        background: rgba(0, 0, 0, 0.1);
-      }
-
-      body.dark-mode .sidebar-toggle:hover {
-        background: rgba(255, 255, 255, 0.1);
-      }
-
-      .sidebar-content {
-        flex: 1;
-        padding: 20px;
-        overflow-y: auto;
-      }
-
-      .sidebar.collapsed .sidebar-content {
-        padding: 10px;
-      }
-
-      .user-profile {
-        display: flex;
-        align-items: center;
-        margin-bottom: 30px;
-        padding: 15px;
-        background: white;
-        border-radius: 10px;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-      }
-
-      body.dark-mode .user-profile {
-        background: #3d3d3d;
-        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-      }
-
-      .sidebar.collapsed .user-profile {
-        justify-content: center;
-        padding: 10px;
-      }
-
-      .avatar {
-        width: 40px;
-        height: 40px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-weight: bold;
-        font-size: 18px;
-        margin-right: 12px;
-      }
-
-      .sidebar.collapsed .avatar {
-        margin-right: 0;
-      }
-
-      .user-info {
-        flex: 1;
-      }
-
-      .sidebar.collapsed .user-info {
-        display: none;
-      }
-
-      .user-name {
-        font-weight: 600;
-        margin-bottom: 2px;
-      }
-
-      .user-email {
-        font-size: 12px;
-        color: #666;
-      }
-
-      body.dark-mode .user-email {
-        color: #ccc;
-      }
-
-      .sidebar-menu {
-        margin-bottom: 30px;
-      }
-
-      .menu-item {
-        width: 100%;
-        display: flex;
-        align-items: center;
-        padding: 12px 15px;
-        background: white;
-        border: none;
-        border-radius: 8px;
-        cursor: pointer;
-        margin-bottom: 8px;
-        transition: all 0.2s ease;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-      }
-
-      body.dark-mode .menu-item {
-        background: #3d3d3d;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-      }
-
-      .menu-item:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-      }
-
-      body.dark-mode .menu-item:hover {
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-      }
-
-      .menu-icon {
-        font-size: 18px;
-        margin-right: 12px;
-        width: 20px;
-        text-align: center;
-      }
-
-      .sidebar.collapsed .menu-icon {
-        margin-right: 0;
-      }
-
-      .menu-text {
-        flex: 1;
-        text-align: left;
-      }
-
-      .sidebar.collapsed .menu-text {
-        display: none;
-      }
-
-      .chat-history-section {
-        flex: 1;
-      }
-
-      .section-header {
-        margin-bottom: 15px;
-      }
-
-      .section-title {
-        font-weight: 600;
-        font-size: 14px;
-        color: #666;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-      }
-
-      body.dark-mode .section-title {
-        color: #ccc;
-      }
-
-      .sidebar.collapsed .section-title {
-        display: none;
-      }
-
-      .chat-history-list {
-        max-height: 400px;
-        overflow-y: auto;
-      }
-
-      .chat-history-item {
-        padding: 12px;
-        margin-bottom: 8px;
-        background: white;
-        border-radius: 8px;
-        cursor: pointer;
-        transition: all 0.2s ease;
-        border-left: 3px solid transparent;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-      }
-
-      body.dark-mode .chat-history-item {
-        background: #3d3d3d;
-        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-      }
-
-      .chat-history-item:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-        border-left-color: #667eea;
-      }
-
-      body.dark-mode .chat-history-item:hover {
-        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
-      }
-
-      .chat-history-item.active {
-        border-left-color: #667eea;
-        background: #f0f8ff;
-        font-weight: 500;
-      }
-
-      body.dark-mode .chat-history-item.active {
-        background: #4d4d4d;
-        border-left-color: #667eea;
-      }
-
-      .chat-preview {
-        font-size: 14px;
-        line-height: 1.4;
-        color: #333;
-      }
-
-      body.dark-mode .chat-preview {
-        color: #e0e0e0;
-      }
-
-      .chat-timestamp {
-        font-size: 12px;
-        color: #999;
-        margin-top: 4px;
-      }
-
-      body.dark-mode .chat-timestamp {
-        color: #aaa;
-      }
-
-      .sidebar.collapsed .chat-history-item {
-        padding: 8px;
-        text-align: center;
-      }
-
-      .sidebar.collapsed .chat-preview,
-      .sidebar.collapsed .chat-timestamp {
-        display: none;
-      }
-
-      .sidebar-overlay {
-        display: none;
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.5);
-        z-index: 999;
-      }
-
-      .sidebar-overlay.active {
-        display: block;
-      }
-
-      .main-content {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-      }
-
-      .chat-container {
-        flex: 1;
-        display: flex;
-        flex-direction: column;
-        overflow: hidden;
-        background: white;
-        transition: background-color 0.3s ease;
-      }
-
-      body.dark-mode .chat-container {
-        background: #1a1a1a;
-      }
-
-      .chat-header {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        padding: 20px;
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-size: 1.5rem;
-        font-weight: bold;
-      }
-
-      .logout-btn {
-        background: rgba(255, 255, 255, 0.2);
-        color: white;
-        border: 1px solid rgba(255, 255, 255, 0.3);
-        padding: 8px 16px;
-        border-radius: 20px;
-        cursor: pointer;
-        font-size: 14px;
-        transition: all 0.3s ease;
-      }
-
-      .logout-btn:hover {
-        background: rgba(255, 255, 255, 0.3);
-        transform: scale(1.05);
-      }
-
-      .chat-messages {
-        flex: 1;
-        padding: 20px;
-        overflow-y: auto;
-        background: #f8f9fa;
-        transition: background-color 0.3s ease;
-      }
-
-      body.dark-mode .chat-messages {
-        background: #1a1a1a;
-      }
-
-      .message {
-        margin-bottom: 20px;
-        padding: 15px 20px;
-        border-radius: 18px;
-        max-width: 70%;
-        word-wrap: break-word;
-        animation: fadeIn 0.3s ease-in;
-      }
-
-      .message.bot {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        margin-right: auto;
-        border-bottom-left-radius: 5px;
-      }
-
-      .message.bot.error-message {
-        background: linear-gradient(135deg, #dc3545 0%, #c82333 100%);
-      }
-
-      .message.user {
-        background: #e9ecef;
-        color: #333;
-        margin-left: auto;
-        text-align: right;
-        border-bottom-right-radius: 5px;
-      }
-
-      body.dark-mode .message.user {
-        background: #3d3d3d;
-        color: #e0e0e0;
-      }
-
-      .chat-input-area {
-        padding: 20px;
-        background: white;
-        border-top: 1px solid #e9ecef;
-        display: flex;
-        gap: 10px;
-        align-items: center;
-        transition: background-color 0.3s ease, border-color 0.3s ease;
-      }
-
-      body.dark-mode .chat-input-area {
-        background: #1a1a1a;
-        border-top: 1px solid #404040;
-      }
-
-      .text-input {
-        flex: 1;
-        padding: 12px 20px;
-        border: 2px solid #e9ecef;
-        border-radius: 25px;
-        font-size: 16px;
-        outline: none;
-        transition: border-color 0.3s, background-color 0.3s, color 0.3s;
-        background: white;
-        color: #333;
-      }
-
-      body.dark-mode .text-input {
-        background: #2d2d2d;
-        border-color: #555;
-        color: #e0e0e0;
-      }
-
-      .text-input:focus {
-        border-color: #667eea;
-      }
-
-      .send-btn {
-        padding: 12px 20px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border: none;
-        border-radius: 25px;
-        cursor: pointer;
-        font-size: 16px;
-        transition: transform 0.2s;
-      }
-
-      .send-btn:hover {
-        transform: scale(1.05);
-      }
-
-      .audio-controls {
-        display: flex;
-        gap: 10px;
-      }
-
-      .record-btn {
-        padding: 12px;
-        background: #dc3545;
-        color: white;
-        border: none;
-        border-radius: 50%;
-        cursor: pointer;
-        width: 50px;
-        height: 50px;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all 0.3s;
-      }
-
-      .record-btn.recording {
-        background: #28a745;
-        animation: pulse 1s infinite;
-      }
-
-      .loading {
-        display: none;
-        text-align: center;
-        padding: 20px;
-      }
-
-      .spinner {
-        border: 4px solid #f3f3f3;
-        border-top: 4px solid #667eea;
-        border-radius: 50%;
-        width: 40px;
-        height: 40px;
-        animation: spin 1s linear infinite;
-        margin: 0 auto 10px;
-      }
-
-      @keyframes fadeIn {
-        from {
-          opacity: 0;
-          transform: translateY(20px);
-        }
-        to {
-          opacity: 1;
-          transform: translateY(0);
-        }
-      }
-
-      @keyframes spin {
-        0% {
-          transform: rotate(0deg);
-        }
-        100% {
-          transform: rotate(360deg);
-        }
-      }
-
-      @keyframes pulse {
-        0% {
-          transform: scale(1);
-        }
-        100% {
-          transform: scale(1.1);
-        }
-      }
-
-      .typing-indicator {
-        display: none;
-        padding: 15px 20px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
-        border-radius: 18px;
-        margin-bottom: 20px;
-        margin-right: auto;
-        max-width: 70%;
-        border-bottom-left-radius: 5px;
-      }
-
-      .typing-dots {
-        display: flex;
-        gap: 4px;
-      }
-
-      .typing-dots span {
-        width: 8px;
-        height: 8px;
-        background: white;
-        border-radius: 50%;
-        animation: typing 1.4s infinite;
-      }
-
-      .typing-dots span:nth-child(2) {
-        animation-delay: 0.2s;
-      }
-      .typing-dots span:nth-child(3) {
-        animation-delay: 0.4s;
-      }
-
-      @keyframes typing {
-        0%,
-        60%,
-        100% {
-          transform: translateY(0);
-        }
-        30% {
-          transform: translateY(-10px);
-        }
-      }
-
-      @media (max-width: 768px) {
-        .app-container {
-          height: 100vh;
-          border-radius: 0;
-        }
-
-        .sidebar {
-          position: absolute;
-          left: -280px;
-          top: 0;
-          height: 100%;
-          z-index: 1000;
-          transition: left 0.3s ease;
-        }
-
-        .sidebar.open {
-          left: 0;
-        }
-
-        .main-content {
-          width: 100%;
-        }
-
-        .sidebar-toggle {
-          display: block;
-          position: absolute;
-          top: 10px;
-          right: 10px;
-          z-index: 1001;
-        }
-
-        .message {
-          max-width: 85%;
-        }
-
-        .chat-input-area {
-          padding: 15px;
-        }
-      }
-    </style>
-  </head>
-  <body>
     <div class="app-container">
-      <!-- Sidebar Overlay for Mobile -->
-      <div class="sidebar-overlay" id="sidebarOverlay"></div>
-      
-      <!-- Sidebar -->
-      <div class="sidebar" id="sidebar">
-        <div class="sidebar-header">
-          <button class="sidebar-toggle" id="sidebarToggle">
-            <span class="toggle-icon">☰</span>
-          </button>
-        </div>
-        
-        <div class="sidebar-content">
-          <!-- User Profile -->
-          <div class="user-profile">
-            <div class="avatar" id="userAvatar"></div>
-            <div class="user-info">
-              <div class="user-name" id="userName"></div>
-              <div class="user-email" id="userEmail"></div>
+        <!-- INSIGHT SIDEBAR -->
+        <aside class="sidebar" id="sidebar">
+            <!-- Fixed Header -->
+            <div class="sidebar-header">
+                <i class="fa-solid fa-brain" style="color: var(--accent-color)"></i>
+                <span class="brand-title">AGITherapist</span>
+                <button class="action-btn" onclick="toggleSidebar()" style="margin-left: auto; width: 32px; height: 32px; font-size: 0.8rem;">
+                    <i class="fa-solid fa-times"></i>
+                </button>
             </div>
-          </div>
-          
-          <!-- Menu Items -->
-          <div class="sidebar-menu">
-            <button class="menu-item" id="newChatBtn">
-              <span class="menu-icon">➕</span>
-              <span class="menu-text">New Chat</span>
-            </button>
-            
-            <button class="menu-item" id="settingsBtn">
-              <span class="menu-icon">⚙️</span>
-              <span class="menu-text">Settings</span>
-            </button>
-            
-            <button class="menu-item" id="themeToggle">
-              <span class="menu-icon" id="themeIcon">🌙</span>
-              <span class="menu-text">Dark Mode</span>
-            </button>
-          </div>
-          
-          <!-- Chat History -->
-          <div class="chat-history-section">
-            <div class="section-header">
-              <span class="section-title">Chat History</span>
+
+            <!-- Scrollable Middle Content -->
+            <div class="sidebar-scroll">
+                <button class="sidebar-action" onclick="startNewSession()" style="background: rgba(0, 243, 255, 0.1); border: 1px solid var(--accent-color); color: var(--accent-color); margin-top: 16px;">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>New Session</span>
+                </button>
+
+                <!-- Mood Tracker -->
+                <div class="section-header">Live Status</div>
+                <div class="stat-card">
+                    <div class="stat-label">Reference Tone</div>
+                    <div class="mood-indicator">
+                        <div class="mood-dot" id="mood-dot"></div>
+                        <span id="mood-text" style="font-size: 0.9rem; font-weight: 500;">Stable</span>
+                    </div>
+                </div>
+
+                <button class="sidebar-action" onclick="openDashboard()" style="margin-top: 4px;">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>My Progress</span>
+                </button>
+                <a href="/analytics" class="sidebar-action" style="text-decoration:none; display:flex; align-items:center; gap:10px;">
+                    <i class="fa-solid fa-chart-pie" style="color:var(--accent);"></i>
+                    <span>Full Clinical Analytics</span>
+                    <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.65rem; margin-left:auto; opacity:0.5;"></i>
+                </a>
+
+                <!-- Memory Snapshot (loads on page load) -->
+                <div class="section-header">Memory Snapshot</div>
+                <div id="memory-snapshot" style="padding: 10px 12px; font-size: 0.82rem; color: var(--text-secondary); background: rgba(0,243,255,0.03); border-radius: 8px; margin-bottom: 8px; min-height: 40px;">
+                    Loading...
+                </div>
+
+                <!-- History -->
+                <div class="section-header">Memory Archives</div>
+                <div class="history-list" id="history-list">
+                    <!-- Populated via JS -->
+                    <div style="padding: 10px; color: var(--text-secondary); font-size: 0.85rem;">Loading archives...</div>
+                </div>
             </div>
-            <div class="chat-history-list" id="chatHistoryList">
-              <!-- Chat history items will be loaded here -->
+
+            <!-- Fixed Footer: User Controls -->
+            <div class="sidebar-footer">
+                <div class="stat-label">User Profile</div>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                    <div class="avatar" style="width: 32px; height: 32px; background: var(--accent-color); color: #000; font-size: 0.9rem;">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                    <div style="font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis;">{{ user_name }}</div>
+                </div>
+                <button class="sidebar-action" onclick="openSettings()">
+                    <i class="fa-solid fa-cog"></i>
+                    <span>System Config</span>
+                </button>
+                <button class="sidebar-action" onclick="location.href='/logout'" style="color: #ef4444;">
+                    <i class="fa-solid fa-power-off"></i>
+                    <span>Disconnect</span>
+                </button>
             </div>
-          </div>
-        </div>
-      </div>
-      
-      <!-- Main Chat Area -->
-      <div class="main-content" id="mainContent">
-        <div class="chat-container">
-          <div class="chat-header">
-            <span>🤖 AI Therapist</span>
-            <div>
-              <a href="/logout" class="logout-btn" style="text-decoration: none;">Logout</a>
+        </aside>
+
+        <!-- MAIN CHAT AREA -->
+        <main class="chat-area">
+            <header class="chat-header">
+                <button class="action-btn" onclick="toggleSidebar()">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                
+                <div class="therapist-status">
+                    <div class="orb-container">
+                        <div class="orb" id="orb"></div>
+                    </div>
+                    <div style="text-align: left;">
+                        <div style="font-weight: 600; font-size: 0.95rem;">AGI-119 Core</div>
+                        <div class="status-text" id="status-text">Online & Listening</div>
+                    </div>
+                </div>
+
+                <button class="action-btn" onclick="openSettings()">
+                    <i class="fa-solid fa-sliders"></i>
+                </button>
+            </header>
+
+            <div class="messages-wrapper" id="messages-container">
+                <!-- Welcome Message -->
+                <div class="message-row bot">
+                    <div class="avatar"><i class="fa-solid fa-robot"></i></div>
+                    <div class="message-bubble">
+                        I am AGI-119. I'm here to listen, process, and support you. How are you feeling right now?
+                    </div>
+                </div>
             </div>
-          </div>
-          <div class="chat-messages" id="chatMessages">
-            <div class="typing-indicator" id="typingIndicator">
-              <div class="typing-dots">
-                <span></span>
-                <span></span>
-                <span></span>
-              </div>
+
+            <!-- INPUT AREA -->
+            <div class="input-area">
+                <div class="input-capsule">
+                    <button class="action-btn" id="mic-btn" onclick="toggleMic()">
+                        <i class="fa-solid fa-microphone"></i>
+                    </button>
+                    <textarea id="user-input" placeholder="Type your thoughts..." rows="1" oninput="autoResize(this)"></textarea>
+                    <button class="action-btn send-btn" onclick="sendMessage()">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
             </div>
-          </div>
-          <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <p>Processing your message...</p>
-          </div>
-          <div class="chat-input-area">
-            <input
-              type="text"
-              class="text-input"
-              id="textInput"
-              placeholder="Type your message here..."
-            />
-            <div class="audio-controls">
-              <button class="record-btn" id="recordBtn" title="Hold to record">
-                🎤
-              </button>
-            </div>
-            <button class="send-btn" id="sendBtn">Send</button>
-          </div>
-        </div>
-      </div>
+        </main>
     </div>
 
-    <script>
-      // Sidebar elements
-      const sidebar = document.getElementById("sidebar");
-      const sidebarToggle = document.getElementById("sidebarToggle");
-      const sidebarOverlay = document.getElementById("sidebarOverlay");
-      const mainContent = document.getElementById("mainContent");
-      const userAvatar = document.getElementById("userAvatar");
-      const userName = document.getElementById("userName");
-      const userEmail = document.getElementById("userEmail");
-      const newChatBtn = document.getElementById("newChatBtn");
-      const settingsBtn = document.getElementById("settingsBtn");
-      const themeToggle = document.getElementById("themeToggle");
-      const themeIcon = document.getElementById("themeIcon");
-      const chatHistoryList = document.getElementById("chatHistoryList");
+    <!-- SETTINGS MODAL -->
+    <div class="modal-overlay" id="settings-modal" onclick="closeSettings(event)">
+        <div class="modal" id="settings-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">System Configuration</div>
+                <button class="close-modal" onclick="closeSettings()"><i class="fa-solid fa-times"></i></button>
+            </div>
 
-      // Chat elements
-      const chatMessages = document.getElementById("chatMessages");
-      const textInput = document.getElementById("textInput");
-      const sendBtn = document.getElementById("sendBtn");
-      const recordBtn = document.getElementById("recordBtn");
-      const loading = document.getElementById("loading");
-      const typingIndicator = document.getElementById("typingIndicator");
+            <!-- Tabs -->
+            <div style="display: flex; gap: 16px; margin-bottom: 24px; border-bottom: 1px solid var(--glass-border);">
+                <button class="tab-btn active" onclick="switchTab('general')">General</button>
+                <button class="tab-btn" onclick="switchTab('api')">API & Model</button>
+                <button class="tab-btn" onclick="switchTab('insights')">Medical Insights</button>
+            </div>
 
-      let mediaRecorder;
-      let audioChunks = [];
-      let isRecording = false;
-      let isDarkMode = localStorage.getItem('darkMode') === 'true';
-      let currentConversationId = localStorage.getItem('currentConversationId') || null;
+            <!-- General Tab -->
+            <div id="tab-general" class="tab-content">
+                <div class="setting-group">
+                    <label>Interface Theme</label>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <span style="font-size: 0.9rem; color: var(--text-secondary);">Dark Tech Mode</span>
+                        <div style="margin-left: auto;">
+                            <!-- Only dark mode supported for now in this request -->
+                             <span style="color: var(--accent-color); font-size: 0.8rem;">Active</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
-      // Initialize the app
-      initializeApp();
+            <!-- API Tab -->
+            <div id="tab-api" class="tab-content" style="display: none;">
+                <div class="setting-group">
+                    <label>Gemini API Key</label>
+                    <input type="password" id="gemini-key" class="setting-input" placeholder="Enter your Gemini API Key">
+                    <button class="save-btn" onclick="saveApiKey()">Update Key</button>
+                    <div style="margin-top: 8px; font-size: 0.8rem; color: var(--text-secondary);">Key is securely stored in your profile settings.</div>
+                </div>
+            </div>
 
-      // Initialize app function
-      function initializeApp() {
-        // Set up user profile
-        setupUserProfile();
-        
-        // Set up theme
-        setupTheme();
-        
-        // Load chat history
-        loadChatHistory();
-        
-        // Set up event listeners
-        setupEventListeners();
-        
-        // Load current conversation or start new
-        if (currentConversationId) {
-          loadConversation(currentConversationId);
-        } else {
-          startConversation();
-        }
-      }
+            <!-- Insights Tab -->
+            <div id="tab-insights" class="tab-content" style="display: none;">
+                <div class="setting-group">
+                    <label>Long-Term Condition Analysis</label>
+                    <div style="height: 250px; width: 100%;">
+                        <canvas id="healthChart"></canvas>
+                    </div>
+                </div>
+            </div>
 
-      // Set up user profile
-      function setupUserProfile() {
-        // Get user data from template variables
-        const userNameData = "{{ user_name }}";
-        const userEmailData = "{{ user_email }}";
-        
-        const userData = {
-          name: userNameData || "User",
-          email: userEmailData || "user@example.com"
-        };
-        
-        if (userName) userName.textContent = userData.name;
-        if (userEmail) userEmail.textContent = userData.email;
-        if (userAvatar) userAvatar.textContent = userData.name.charAt(0).toUpperCase();
-      }
+        </div>
+    </div>
 
-      // Set up theme
-      function setupTheme() {
-        if (isDarkMode) {
-          document.body.classList.add('dark-mode');
-          if (themeIcon) themeIcon.textContent = '☀️';
-        } else {
-          if (themeIcon) themeIcon.textContent = '🌙';
-        }
-      }
+    <!-- DASHBOARD MODAL -->
+    <div class="modal-overlay" id="dashboard-modal" onclick="closeDashboard(event)">
+        <div class="modal" id="dashboard-content" onclick="event.stopPropagation()" style="max-width: 800px;">
+            <div class="modal-header">
+                <div class="modal-title">Therapeutic Progress Dashboard</div>
+                <button class="close-modal" onclick="closeDashboard()"><i class="fa-solid fa-times"></i></button>
+            </div>
 
-      // Load chat history (conversation threads)
-      async function loadChatHistory() {
-        try {
-          const response = await fetch('/get_conversation_threads', {
-            credentials: 'include'
-          });
-          
-          if (!response.ok) {
-            throw new Error('Failed to fetch conversation threads');
-          }
-          
-          const data = await response.json();
-          
-          if (data.threads && data.threads.length > 0) {
-            chatHistoryList.innerHTML = '';
-            data.threads.forEach(thread => {
-              const historyItem = document.createElement('div');
-              historyItem.className = `chat-history-item ${thread.id === currentConversationId ? 'active' : ''}`;
-              historyItem.setAttribute('data-conversation-id', thread.id);
-              
-              // Format the date safely
-              let dateStr = 'Unknown date';
-              try {
-                if (thread.last_message) {
-                  dateStr = new Date(thread.last_message).toLocaleDateString();
-                }
-              } catch (e) {
-                dateStr = 'Recent';
-              }
-              
-              historyItem.innerHTML = `
-                <div class="chat-preview">${thread.title || 'Conversation'}</div>
-                <div class="chat-timestamp">${dateStr}</div>
-              `;
-              historyItem.addEventListener('click', (e) => {
-                loadConversation(thread.id);
-                // Update active state
-                document.querySelectorAll('.chat-history-item').forEach(item => {
-                  item.classList.remove('active');
-                });
-                e.target.closest('.chat-history-item').classList.add('active');
-              });
-              chatHistoryList.appendChild(historyItem);
-            });
-          } else {
-            chatHistoryList.innerHTML = '<div class="no-history" style="padding: 10px; color: #666; font-size: 14px;">No conversations yet. Start a new chat!</div>';
-          }
-        } catch (error) {
-          console.error('Error loading chat history:', error);
-          chatHistoryList.innerHTML = '<div class="no-history" style="padding: 10px; color: #666; font-size: 14px;">Start a new conversation</div>';
-        }
-      }
+            <div style="display: flex; gap: 16px; margin-bottom: 24px; border-bottom: 1px solid var(--glass-border);">
+                <button class="tab-btn active" onclick="switchDashTab('timeline')">Session Timeline</button>
+                <button class="tab-btn" onclick="switchDashTab('report')">Medical Report</button>
+            </div>
 
-      // Load a specific conversation
-      async function loadConversation(conversationId) {
-        try {
-          // Update current conversation
-          currentConversationId = conversationId;
-          localStorage.setItem('currentConversationId', conversationId);
-          
-          // Try to load conversation messages
-          const response = await fetch(`/get_conversation/${conversationId}`, {
-            credentials: 'include'
-          });
-          const data = await response.json();
-          
-          if (data.messages && data.messages.length > 0) {
-            // Clear current messages
-            chatMessages.innerHTML = '';
-            
-            // Add loaded messages
-            data.messages.forEach(msg => {
-              addMessage(msg.text, msg.type);
-            });
-          } else {
-            // No messages yet, start new conversation
-            chatMessages.innerHTML = '';
-            startConversation();
-          }
-        } catch (error) {
-          console.error('Error loading conversation:', error);
-          // If loading fails, start a new conversation
-          chatMessages.innerHTML = '';
-          startConversation();
-        }
-      }
+            <div id="dash-timeline" class="dash-tab-content">
+                <div id="timeline-container" style="display: flex; flex-direction: column; gap: 12px; max-height: 400px; overflow-y: auto;">
+                    <div style="text-align: center; color: var(--text-secondary);">Loading timeline...</div>
+                </div>
+            </div>
 
-      // Set up event listeners
-      function setupEventListeners() {
-        // Sidebar toggle
-        if (sidebarToggle) sidebarToggle.addEventListener('click', toggleSidebar);
-        
-        // New chat
-        if (newChatBtn) newChatBtn.addEventListener('click', () => {
-          startNewChat();
-          closeSidebarOnMobile();
-        });
-        
-        // Settings
-        if (settingsBtn) settingsBtn.addEventListener('click', () => {
-          window.location.href = '/settings';
-          closeSidebarOnMobile();
-        });
-        
-        // Theme toggle
-        if (themeToggle) themeToggle.addEventListener('click', () => {
-          toggleTheme();
-          closeSidebarOnMobile();
-        });
-        
-        // Send text message
-        if (sendBtn) sendBtn.addEventListener("click", sendTextMessage);
-        if (textInput) textInput.addEventListener("keypress", (e) => {
-          if (e.key === "Enter") {
-            sendTextMessage();
-          }
-        });
-        
-        // Audio recording
-        if (recordBtn) {
-          recordBtn.addEventListener("mousedown", startRecording);
-          recordBtn.addEventListener("mouseup", stopRecording);
-          recordBtn.addEventListener("mouseleave", stopRecording);
-        }
-      }
+            <div id="dash-report" class="dash-tab-content" style="display: none;">
+                <div class="setting-group">
+                    <label>Medical Profile & History</label>
+                    <div id="medical-list" style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; margin-bottom: 12px;"></div>
+                </div>
+                <div class="setting-group">
+                    <label>Personal Considerations</label>
+                    <div id="personal-list" style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
 
-      // Toggle sidebar
-      function toggleSidebar() {
-        const isMobile = window.innerWidth <= 768;
-        const toggleIcon = document.querySelector('.toggle-icon');
-        
-        if (isMobile) {
-          sidebar.classList.toggle('open');
-          sidebarOverlay.classList.toggle('active');
-          // Update icon for mobile
-          if (sidebar.classList.contains('open')) {
-            toggleIcon.textContent = '✕';
-          } else {
-            toggleIcon.textContent = '☰';
-          }
-        } else {
-          sidebar.classList.toggle('collapsed');
-          // Update icon for desktop
-          if (sidebar.classList.contains('collapsed')) {
-            toggleIcon.textContent = '▶';
-          } else {
-            toggleIcon.textContent = '◀';
-          }
-        }
-      }
-
-      // Close sidebar when clicking overlay
-      sidebarOverlay.addEventListener('click', () => {
-        sidebar.classList.remove('open');
-        sidebarOverlay.classList.remove('active');
-      });
-
-      // Start new chat
-      function startNewChat() {
-        // Generate new conversation ID
-        currentConversationId = generateConversationId();
-        localStorage.setItem('currentConversationId', currentConversationId);
-        
-        // Clear messages
-        chatMessages.innerHTML = '';
-        
-        // Update active state
-        document.querySelectorAll('.chat-history-item').forEach(item => {
-            item.classList.remove('active');
-        });
-        
-        // Start conversation
-        startConversation();
-        
-        // Reload chat history to show new conversation
-        loadChatHistory();
-      }
-
-      // Generate a new conversation ID
-      function generateConversationId() {
-        return 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-      }
-
-      // Close sidebar on mobile
-      function closeSidebarOnMobile() {
-        const isMobile = window.innerWidth <= 768;
-        if (isMobile) {
-          sidebar.classList.remove('open');
-          sidebarOverlay.classList.remove('active');
-        }
-      }
-
-      // Toggle theme
-      function toggleTheme() {
-        isDarkMode = !isDarkMode;
-        document.body.classList.toggle('dark-mode');
-        localStorage.setItem('darkMode', isDarkMode);
-        setupTheme();
-      }
-
-      async function startConversation() {
-        typingIndicator.style.display = "block";
-        try {
-          const formData = new FormData();
-          if (currentConversationId) {
-            formData.append('conversation_id', currentConversationId);
-          }
-          
-          const response = await fetch("/start_conversation", {
-            method: "POST",
-            body: formData,
-            credentials: 'include'
-          });
-          const data = await response.json();
-          
-          if (data.conversation_id) {
-            currentConversationId = data.conversation_id;
-            localStorage.setItem('currentConversationId', currentConversationId);
-          }
-          
-          addMessage(data.message, "bot");
-        } catch (error) {
-          console.error("Error starting conversation:", error);
-          addMessage(
-            "Hello! I'm your AI therapist. How are you feeling today?",
-            "bot"
-          );
-        } finally {
-          typingIndicator.style.display = "none";
-        }
-      }
-
-      function sendTextMessage() {
-        const text = textInput.value.trim();
-        if (!text) return;
-
-        addMessage(text, "user");
-        textInput.value = "";
-        processMessage({ text });
-      }
-
-      async function startRecording() {
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({
-            audio: true,
-          });
-          mediaRecorder = new MediaRecorder(stream);
-          audioChunks = [];
-
-          mediaRecorder.ondataavailable = (event) => {
-            audioChunks.push(event.data);
-          };
-
-          mediaRecorder.onstop = () => {
-            stream.getTracks().forEach((track) => track.stop());
-            const audioBlob = new Blob(audioChunks, { type: "audio/wav" });
-            processMessage({ audio: audioBlob });
-          };
-
-          mediaRecorder.start();
-          isRecording = true;
-          recordBtn.classList.add("recording");
-          recordBtn.textContent = "🔴";
-        } catch (error) {
-          console.error("Error accessing microphone:", error);
-          addMessage(
-            "Error accessing microphone. Please check permissions.",
-            "bot"
-          );
-        }
-      }
-
-      function stopRecording() {
-        if (mediaRecorder && isRecording) {
-          mediaRecorder.stop();
-          isRecording = false;
-          recordBtn.classList.remove("recording");
-          recordBtn.textContent = "🎤";
-        }
-      }
-
-      let isProcessing = false;
-
-      async function processMessage(data) {
-        if (isProcessing) return;
-        isProcessing = true;
-        loading.style.display = "block";
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-
-        try {
-          const formData = new FormData();
-
-          if (data.text) {
-            formData.append("text", data.text);
-          } else if (data.audio) {
-            formData.append("audio", data.audio, "recording.wav");
-          }
-          
-          if (currentConversationId) {
-            formData.append("conversation_id", currentConversationId);
-          }
-
-          const response = await fetch("/analyze", {
-            method: "POST",
-            body: formData,
-            signal: controller.signal,
-            credentials: 'include'
-          });
-
-          clearTimeout(timeoutId);
-
-          const result = await response.json();
-
-          if (result.error) {
-            // Handle specific error types
-            const errorMessage = result.error.toLowerCase();
-            
-              if (errorMessage.includes('quota') || errorMessage.includes('quota exceeded')) {
-              addErrorMessage(
-                "🔴 API Quota Exceeded",
-                "Your API quota has been exceeded. Please update your Groq token in Settings.",
-                "quota-error"
-              );
-            } else if (errorMessage.includes('invalid api key') || errorMessage.includes('unauthorized')) {
-              addErrorMessage(
-                "🔴 Invalid API Key",
-                "There's an issue with your Groq token. Please update it in Settings.",
-                "key-error"
-              );
-            } else if (errorMessage.includes('rate limit')) {
-              addErrorMessage(
-                "⏱️ Rate Limited",
-                "Too many requests. Please wait a moment and try again.",
-                "rate-limit"
-              );
-            } else {
-              addMessage("Sorry, I encountered an error: " + result.error, "bot");
-            }
-          } else {
-            // If audio, show transcription
-            if (data.audio && result.transcript) {
-              addTranscription(result.transcript);
-            }
-            addMessage(result.message, "bot", result.audio_url);
-          }
-        } catch (error) {
-          console.error("Error processing message:", error);
-          if (error.name === 'AbortError') {
-            addMessage("Request timed out. Please try again.", "bot");
-          } else {
-            addMessage(
-              "Sorry, I encountered an error processing your message.",
-              "bot"
-            );
-          }
-        } finally {
-          loading.style.display = "none";
-          isProcessing = false;
-        }
-      }
-
-      function addMessage(text, type, audioUrl = null) {
-        const messageDiv = document.createElement("div");
-        messageDiv.className = `message ${type}`;
-        messageDiv.textContent = text;
-        if (audioUrl) {
-          const audio = document.createElement("audio");
-          audio.controls = true;
-          audio.src = audioUrl;
-          messageDiv.appendChild(audio);
-        }
-        chatMessages.appendChild(messageDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-      }
-
-      function addErrorMessage(title, message, errorType) {
-        const errorDiv = document.createElement("div");
-        errorDiv.className = `message bot error-message error-${errorType}`;
-        errorDiv.innerHTML = `
-          <div style="font-weight: bold; margin-bottom: 8px;">${title}</div>
-          <div style="font-size: 0.95em; line-height: 1.5;">${message}</div>
-          <button onclick="window.location.href = '/settings'" style="
-            margin-top: 12px;
+    <style>
+        .tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
             padding: 8px 16px;
-            background: rgba(255,255,255,0.2);
-            border: 1px solid rgba(255,255,255,0.4);
-            color: white;
-            border-radius: 20px;
             cursor: pointer;
-            font-size: 0.9em;
-          ">Go to Settings →</button>
-        `;
-        chatMessages.appendChild(errorDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-      }
+            border-bottom: 2px solid transparent;
+            font-weight: 500;
+        }
+        .tab-btn.active {
+            color: var(--accent-color);
+            border-bottom-color: var(--accent-color);
+        }
+        
+        /* Delete Button Styles */
+        .history-item {
+            position: relative;
+            padding-right: 40px !important;
+        }
+        .delete-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+            border: none;
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.2s;
+        }
+        .history-item:hover .delete-btn,
+        .timeline-item:hover .delete-btn {
+            opacity: 1;
+        }
+        .delete-btn:hover {
+            background: #ef4444;
+            color: white;
+        }
+    </style>
 
-      function addTranscription(text) {
-        const messageDiv = document.createElement("div");
-        messageDiv.className = `message user`;
-        messageDiv.innerHTML = `<i>"${text}"</i>`;
-        chatMessages.appendChild(messageDiv);
-        chatMessages.scrollTop = chatMessages.scrollHeight;
-      }
+    <!-- JS LOGIC -->
+    <script>
+        let isRecording = false;
+        let mediaRecorder;
+        let audioChunks = [];
+        let conversationId = null;
+        let chartInstance = null;
+
+        // --- INIT ---
+        window.addEventListener('load', () => {
+             // Mobile check
+             if (window.innerWidth < 768) {
+                document.getElementById('sidebar').classList.remove('active');
+            } else {
+                // Open by default on desktop for better UX
+                 document.getElementById('sidebar').classList.add('active');
+            }
+            
+            loadSettingsAndTheme();
+            loadHistory();
+        });
+
+        // --- SIDEBAR & NAVIGATION ---
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('active');
+            
+            // Adjust chat area margin on desktop
+            /*
+            const chatArea = document.querySelector('.chat-area');
+            if (window.innerWidth > 768) {
+                if (sidebar.classList.contains('active')) {
+                    chatArea.style.marginLeft = '320px';
+                } else {
+                    chatArea.style.marginLeft = '0';
+                }
+            }
+            */
+        }
+
+        function startNewSession() {
+            conversationId = null;
+            localStorage.removeItem('lastConversationId');
+            document.getElementById('messages-container').innerHTML = `
+                <div class="message-row bot">
+                    <div class="avatar"><i class="fa-solid fa-robot"></i></div>
+                    <div class="message-bubble">
+                        I am ready for a new session. How can I help you now?
+                    </div>
+                </div>
+            `;
+            setOrbState('listening');
+            if (window.innerWidth < 768) toggleSidebar();
+        }
+
+        async function loadHistory() {
+            const container = document.getElementById('history-list');
+            try {
+                const res = await fetch(`/api/conversation-threads?_=${new Date().getTime()}`);
+                const data = await res.json();
+                
+                if (data.threads && data.threads.length > 0) {
+                    // Update mood from most recent thread if available
+                    const recent = data.threads[0];
+                    if (recent.mood) {
+                         const moodDot = document.getElementById('mood-dot');
+                         const moodText = document.getElementById('mood-text');
+                         moodText.textContent = recent.mood.toUpperCase();
+                         
+                         let color = '#10b981'; // green
+                         if (recent.mood.includes('sad')) color = '#3b82f6';
+                         if (recent.mood.includes('anx')) color = '#f59e0b';
+                         if (recent.mood.includes('ang')) color = '#ef4444';
+                         
+                         moodDot.style.background = color;
+                         moodDot.style.boxShadow = `0 0 15px ${color}`;
+                    }
+
+                    // --- MEMORY SNAPSHOT: Show recent thread titles in sidebar ---
+                    const snapshot = document.getElementById('memory-snapshot');
+                    const recent5 = data.threads.slice(0, 5);
+                    snapshot.innerHTML = recent5.map(t => {
+                        const d = new Date(t.last_message);
+                        const dateStr = isNaN(d) ? '' : d.toLocaleDateString();
+                        return `<div style="padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05); display:flex; justify-content:space-between;">
+                            <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">${t.title || 'Session'}</span>
+                            <span style="color:rgba(255,255,255,0.3);font-size:0.75rem;">${dateStr}</span>
+                        </div>`;
+                    }).join('');
+
+                    container.innerHTML = data.threads.map(t => `
+                        <div class="history-item" onclick="loadConversation('${t.id}')">
+                            <i class="fa-regular fa-comment-dots"></i>
+                            <div style="flex: 1; overflow: hidden;">
+                                <div style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${t.title || 'Untitled Session'}</div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary);">${new Date(t.last_message).toLocaleDateString()}</div>
+                            </div>
+                            <button class="delete-btn" onclick="event.stopPropagation(); confirmDelete('${t.id}', '${(t.title || 'this session').replace(/'/g, "\\'")}')">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    `).join('');
+                } else {
+                    document.getElementById('memory-snapshot').innerHTML = '<span>No sessions yet. Start chatting!</span>';
+                    container.innerHTML = '<div style="padding: 12px; color: var(--text-secondary); font-size: 0.85rem;">No history found.</div>';
+                }
+
+                // Also preload chart, timeline and report in background
+                loadInsightsGraph();
+                loadTimeline();
+                loadReport();
+
+                // Restore last session
+                const lastSessionId = localStorage.getItem('lastConversationId');
+                if (lastSessionId) {
+                    loadConversation(lastSessionId);
+                }
+            } catch (e) {
+                container.innerHTML = '<div style="color: red; padding: 10px;">Error loading history</div>';
+            }
+        }
+
+        async function loadConversation(id) {
+            conversationId = id;
+            localStorage.setItem('lastConversationId', id);
+            const container = document.getElementById('messages-container');
+            container.innerHTML = '<div style="text-align: center; padding: 20px;">Loading memory...</div>';
+            
+            try {
+                const res = await fetch(`/api/conversation/${id}/messages`);
+                const data = await res.json();
+                
+                container.innerHTML = '';
+                if (data.messages) {
+                    data.messages.forEach(msg => {
+                        addMessage(msg.text, msg.role);
+                    });
+                }
+                if (window.innerWidth < 768) toggleSidebar();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function confirmDelete(id, title) {
+            if (confirm(`Are you sure you want to delete "${title}"? This cannot be undone.`)) {
+                try {
+                    const res = await fetch('/api/delete-conversation', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ conversation_id: id })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        if (conversationId === id) startNewSession();
+                        
+                        // Refresh all lists
+                        loadHistory();
+                        if (document.getElementById('dashboard-modal').classList.contains('open')) {
+                            loadTimeline();
+                            loadReport();
+                        }
+                        // Refresh graph if settings open
+                        if (document.getElementById('settings-modal').classList.contains('open')) {
+                            loadInsightsGraph();
+                        }
+                    } else {
+                        alert("Delete failed: " + data.message);
+                    }
+                } catch (e) {
+                    alert("System error during deletion");
+                }
+            }
+        }
+
+        // --- SETTINGS ---
+        function openSettings() {
+            document.getElementById('settings-modal').classList.add('open');
+            loadInsightsGraph();
+        }
+
+        function closeSettings(e) {
+            if (e && e.target.id !== 'settings-modal') return; // Click outside check within onclick="closeSettings(event)"
+            document.getElementById('settings-modal').classList.remove('open');
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+            document.getElementById('tab-' + tabId).style.display = 'block';
+            
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            event.target.classList.add('active'); // Assumes called from btn
+        }
+
+        async function loadSettingsAndTheme() {
+            try {
+                const res = await fetch('/api/settings');
+                const data = await res.json();
+                if (data.settings) {
+                    // Apply API key if needed for local UI logic (not really needed here, but kept)
+                    if (data.settings.gemini_api_key) {
+                        document.getElementById('gemini-key').value = data.settings.gemini_api_key;
+                    }
+                    
+                    // Apply Theme
+                    if (data.settings.dark_mode) {
+                        document.body.classList.add('dark-mode');
+                        document.getElementById('darkModeToggle').checked = true;
+                    } else {
+                        document.body.classList.remove('dark-mode');
+                    }
+                    
+                    if (data.settings.theme_color) {
+                        document.documentElement.style.setProperty('--accent-color', data.settings.theme_color);
+                    }
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function saveApiKey() {
+            const key = document.getElementById('gemini-key').value.trim();
+            if (!key) return alert('Please enter a key');
+            
+            try {
+                const res = await fetch('/api/settings/gemini-key', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ api_key: key })
+                });
+                const data = await res.json();
+                if (data.success) alert('Success: Key Updated');
+                else alert('Error: ' + data.message);
+            } catch (e) {
+                alert('Update failed');
+            }
+        }
+
+        async function loadInsightsGraph() {
+            try {
+                const res = await fetch('/api/analytics/health');
+                const data = await res.json();
+                
+                if (data.success) {
+                    const ctx = document.getElementById('healthChart').getContext('2d');
+                    if (chartInstance) chartInstance.destroy();
+                    
+                    chartInstance = new Chart(ctx, {
+                        type: 'radar',
+                        data: {
+                            labels: data.labels,
+                            datasets: [{
+                                label: 'User Condition Profile',
+                                data: data.data,
+                                backgroundColor: 'rgba(0, 243, 255, 0.2)',
+                                borderColor: '#00f3ff',
+                                pointBackgroundColor: '#fff',
+                                pointBorderColor: '#fff',
+                                pointHoverBackgroundColor: '#fff',
+                                pointHoverBorderColor: '#00f3ff'
+                            }]
+                        },
+                        options: {
+                            scales: {
+                                r: {
+                                    angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
+                                    grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                                    pointLabels: { color: '#94a3b8' },
+                                    ticks: { backdropColor: 'transparent', color: 'transparent' }
+                                }
+                            },
+                            plugins: {
+                                legend: { labels: { color: 'white' } }
+                            },
+                            maintainAspectRatio: false
+                        }
+                    });
+                }
+            } catch (e) { console.error("Graph error", e); }
+        }
+
+        // --- DASHBOARD LOGIC ---
+        function openDashboard() {
+            document.getElementById('dashboard-modal').classList.add('open');
+            loadTimeline();
+            loadReport();
+        }
+
+        function closeDashboard(e) {
+            if (e && e.target.id !== 'dashboard-modal') return;
+            document.getElementById('dashboard-modal').classList.remove('open');
+        }
+
+        function switchDashTab(tabId) {
+            document.querySelectorAll('.dash-tab-content').forEach(el => el.style.display = 'none');
+            document.getElementById('dash-' + tabId).style.display = 'block';
+            
+            // Update active state for buttons (simple toggle for now)
+            const btns = document.querySelectorAll('#dashboard-modal .tab-btn');
+            btns.forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        async function loadTimeline() {
+            const container = document.getElementById('timeline-container');
+            try {
+                const res = await fetch(`/api/dashboard/timeline?_=${new Date().getTime()}`);
+                const data = await res.json();
+                
+                if (data.success && data.timeline.length > 0) {
+                    container.innerHTML = data.timeline.map(t => `
+                        <div class="timeline-item" style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; display: flex; gap: 12px; align-items: start; position: relative; margin-bottom: 12px;">
+                            <div style="background: var(--accent-color); color: #000; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">
+                                ${new Date(t.date).getDate()}
+                            </div>
+                            <div style="flex: 1;">
+                                <div style="display: flex; justify-content: space-between; padding-right: 30px;">
+                                    <div style="font-weight: 600;">${t.title}</div>
+                                    <div style="font-size: 0.8rem; color: var(--text-secondary);">${new Date(t.date).toLocaleDateString()}</div>
+                                </div>
+                                <div style="font-size: 0.9rem; margin-top: 4px; color: #cbd5e1;">${t.summary || 'Session processed.'}</div>
+                                <div style="margin-top: 8px; display: flex; gap: 8px;">
+                                    <span style="font-size: 0.75rem; background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 10px;">${t.message_count} msgs</span>
+                                    <span style="font-size: 0.75rem; background: rgba(16, 185, 129, 0.2); color: #34d399; padding: 2px 8px; border-radius: 10px;">${t.mood || 'Analyzed'}</span>
+                                </div>
+                            </div>
+                            <button class="delete-btn" style="top: 12px; right: 12px;" onclick="event.stopPropagation(); confirmDelete('${t.id}', '${(t.title || 'this session').replace(/'/g, "\\'")}')">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<div style="text-align: center; color: var(--text-secondary);">No sessions recorded yet.</div>';
+                }
+            } catch (e) {
+                container.innerHTML = '<div style="color: red;">Failed to load timeline.</div>';
+            }
+        }
+
+        async function loadReport() {
+            try {
+                const res = await fetch('/api/dashboard/report');
+                const data = await res.json();
+                
+                if (data.success && data.report) {
+                    const medList = data.report.medical_history.length ? 
+                        data.report.medical_history.map(i => `<div style="margin-bottom: 4px;">• ${i}</div>`).join('') : 
+                        '<span style="color: var(--text-secondary);">No medical records found.</span>';
+                        
+                    const persList = data.report.personal_profile.length ? 
+                        data.report.personal_profile.map(i => `<div style="margin-bottom: 4px;">• ${i}</div>`).join('') : 
+                        '<span style="color: var(--text-secondary);">No personal details found.</span>';
+                        
+                    document.getElementById('medical-list').innerHTML = medList;
+                    document.getElementById('personal-list').innerHTML = persList;
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // --- CHAT LOGIC ---
+        function autoResize(el) {
+            el.style.height = 'auto';
+            el.style.height = el.scrollHeight + 'px';
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            addMessage(text, 'user');
+            input.value = '';
+            input.style.height = 'auto';
+            setOrbState('thinking');
+
+            const formData = new FormData();
+            formData.append('text', text);
+            if (conversationId) formData.append('conversation_id', conversationId);
+
+            try {
+                const res = await fetch('/analyze', { method: 'POST', body: formData });
+                const data = await res.json();
+                
+                setOrbState('speaking');
+                
+                if (data.message) {
+                    addMessage(data.message, 'bot');
+                    conversationId = data.conversation_id;
+                    updateDashboard(data.analysis);
+                    loadHistory(); // Refresh sidebar history
+                } else if (data.error) {
+                    addMessage("System Alert: " + data.error, 'bot');
+                }
+                
+                setTimeout(() => setOrbState('listening'), 2000);
+
+            } catch (e) {
+                console.error(e);
+                addMessage("Connection Failure. Retrying...", 'bot');
+                setOrbState('error');
+            }
+        }
+
+        function addMessage(text, role) {
+            const container = document.getElementById('messages-container');
+            const row = document.createElement('div');
+            row.className = `message-row ${role}`;
+            
+            const avatar = document.createElement('div');
+            avatar.className = 'avatar';
+            avatar.innerHTML = role === 'user' ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-robot"></i>';
+            
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+            
+            try {
+                const raw = marked.parse(text);
+                bubble.innerHTML = DOMPurify.sanitize(raw);
+            } catch (e) {
+                bubble.textContent = text;
+            }
+
+            if (role === 'user') {
+                row.appendChild(bubble); 
+                row.appendChild(avatar);
+            } else {
+                row.appendChild(avatar);
+                row.appendChild(bubble);
+            }
+
+            container.appendChild(row);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function setOrbState(state) {
+            const orb = document.getElementById('orb');
+            const status = document.getElementById('status-text');
+             
+            // Remove lingering animations
+            orb.style.animation = 'none';
+            orb.offsetHeight; /* trigger reflow */
+
+            if (state === 'thinking') {
+                orb.style.animation = 'pulse 0.5s infinite alternate';
+                orb.style.background = 'radial-gradient(circle, #fff, #00f3ff)';
+                status.textContent = 'Processing neural inputs...';
+            } else if (state === 'speaking') {
+                orb.style.animation = 'pulse 0.2s infinite';
+                orb.style.background = 'radial-gradient(circle, #a8c0ff, #3f2b96)';
+                status.textContent = 'Responding...';
+            } else if (state === 'listening') {
+                orb.style.animation = 'float 6s ease-in-out infinite';
+                orb.style.background = 'radial-gradient(circle at 30% 30%, #a8c0ff, #3f2b96)';
+                status.textContent = 'Online & Listening';
+            } else if (state === 'error') {
+                orb.style.background = 'red';
+                status.textContent = 'System Error';
+            }
+        }
+
+        function updateDashboard(analysis) {
+             if (!analysis) return;
+            const moodDot = document.getElementById('mood-dot');
+            const moodText = document.getElementById('mood-text');
+
+            if (analysis.tone && analysis.tone.overall_mood) {
+                const mood = analysis.tone.overall_mood.toLowerCase();
+                moodText.textContent = mood.toUpperCase();
+                
+                let color = '#10b981'; // green
+                if (mood.includes('sad')) color = '#3b82f6'; // blue
+                if (mood.includes('anx')) color = '#f59e0b'; // orange
+                if (mood.includes('ang')) color = '#ef4444'; // red
+                
+                moodDot.style.background = color;
+                moodDot.style.boxShadow = `0 0 15px ${color}`;
+            }
+        }
+
+        // --- AUDIO ---
+        async function toggleMic() {
+            const btn = document.getElementById('mic-btn');
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                    mediaRecorder.onstop = () => {
+                        const blob = new Blob(audioChunks, { type: 'audio/wav' });
+                        sendAudio(blob);
+                        stream.getTracks().forEach(t => t.stop());
+                    };
+                    mediaRecorder.start();
+                    isRecording = true;
+                    btn.style.color = '#ef4444';
+                    btn.classList.add('recording-pulse'); // Add css class for pulse
+                    setOrbState('thinking'); 
+                } catch (e) {
+                    console.error(e);
+                    alert("Microphone access denied. Please allow microphone permissions.");
+                }
+            } else {
+                if (mediaRecorder) mediaRecorder.stop();
+                isRecording = false;
+                btn.style.color = 'var(--text-secondary)';
+                btn.classList.remove('recording-pulse');
+            }
+        }
+
+        async function sendAudio(blob) {
+            const formData = new FormData();
+            formData.append('audio', blob, 'rec.wav');
+            if (conversationId) formData.append('conversation_id', conversationId);
+            
+            // Visual feedback before fetch
+            setOrbState('thinking');
+            
+            try {
+                const res = await fetch('/analyze', { method: 'POST', body: formData });
+                const data = await res.json();
+                
+                setOrbState('speaking');
+
+                if (data.transcript) addMessage("🎙️ " + data.transcript, 'user');
+                if (data.message) {
+                    addMessage(data.message, 'bot');
+                    conversationId = data.conversation_id;
+                    updateDashboard(data.analysis);
+                    loadHistory();
+                }
+                
+                setTimeout(() => setOrbState('listening'), 2000);
+            } catch (e) {
+                console.error(e);
+                setOrbState('error');
+            }
+        }
+        
+        document.getElementById('user-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
     </script>
-  </body>
+</body>
 </html>

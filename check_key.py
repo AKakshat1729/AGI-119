@@ -1,6 +1,6 @@
 import os
 from dotenv import load_dotenv
-from google import genai # <--- The NEW library
+import google.generativeai as genai  # Using the installed google-generativeai package
 
 # 1. Load environment variables
 load_dotenv()
@@ -13,22 +13,37 @@ print(f"✅ Key Found: {key[:5]}...{key[-5:]}" if key else "❌ Key Missing")
 
 if key:
     try:
-        # 3. Initialize the New Client
-        client = genai.Client(api_key=key)
-        
-        print("⏳ Contacting Google API (using google-genai)...")
-        
-        # 4. Generate Content (The new syntax)
-        response = client.models.generate_content(
-            model="gemini-1.5-flash", 
-            contents="Say 'Hello' if this works."
-        )
-        
-        print(f"✅ Response: {response.text}")
-        print("🎉 SUCCESS! The key and library are working.")
-        
+        # 3. Configure Gemini
+        genai.configure(api_key=key)
+
+        print("⏳ Contacting Google API (using google-generativeai)...")
+
+        # 4. List available models
+        models = genai.list_models()
+        available = [m.name for m in models if 'generateContent' in m.supported_generation_methods]
+        print(f"📋 Available models: {available[:5]}")
+
+        # 5. Pick the best available model
+        preferred = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
+        chosen = None
+        for p in preferred:
+            if any(p in m for m in available):
+                chosen = next(m for m in available if p in m)
+                break
+
+        if not chosen and available:
+            chosen = available[0]
+
+        if chosen:
+            print(f"🎯 Testing model: {chosen}")
+            model = genai.GenerativeModel(chosen)
+            response = model.generate_content("Say 'Hello' if this works.")
+            print(f"✅ Response: {response.text}")
+            print("🎉 SUCCESS! The key and library are working.")
+        else:
+            print("❌ No usable models found for your API key.")
+
     except Exception as e:
         print(f"❌ Error: {e}")
-        print("   -> If this is a 404, check if 'gemini-1.5-flash' is available in your region.")
 else:
     print("❌ ERROR: GEMINI_API_KEY not found in .env")

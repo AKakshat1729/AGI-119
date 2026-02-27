@@ -20,4 +20,6 @@ class PerceptionModule:
         tone = analyze_tone(text)
         # NLU process
         nlu_output = nlu_process(text, tone)
+        # Include flag if it was processed as multilingual
+        nlu_output["multilingual"] = tone.get("multilingual", False)
         return nlu_output

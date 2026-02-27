@@ -9,12 +9,16 @@ from datetime import datetime
 # nltk.download('stopwords')
 
 class UserLifeUnderstanding:
-    def __init__(self, user_id="default"):
+    def __init__(self, user_id="default", memory_store=None):
         """
-        Initializes the UserLifeUnderstanding with LongTermMemory for the user.
+        Initializes the UserLifeUnderstanding with a memory store.
         """
         self.user_id = user_id
-        self.ltm = LongTermMemory(user_id=user_id)
+        if memory_store:
+            self.memory_store = memory_store
+        else:
+            from api.memory_store import ServerMemoryStore
+            self.memory_store = ServerMemoryStore()
 
     def connect_past_present(self, current_input, n_results=5):
         """
@@ -25,8 +29,8 @@ class UserLifeUnderstanding:
         Returns:
             list: Relevant past conversations.
         """
-        results = self.ltm.retrieve(current_input, n_results=n_results)
-        return results['documents'] if 'documents' in results else []
+        results = self.memory_store.retrieve_memories(user_id=self.user_id, query=current_input, top_k=n_results)
+        return [r['text'] for r in results]
 
     def analyze_recurring_problems(self, n_recent=50):
         """
@@ -36,24 +40,29 @@ class UserLifeUnderstanding:
         Returns:
             dict: Analysis of recurring problems and patterns.
         """
-        # Retrieve recent memories
-        all_docs = self.ltm.collection.get(limit=n_recent)['documents']
+        # Retrieve recent memories from logs (conversations) or episodic
+        mems = self.memory_store.retrieve_memories(user_id=self.user_id, query="", memory_type="conversation", top_k=n_recent)
+        if not mems:
+             mems = self.memory_store.retrieve_memories(user_id=self.user_id, query="", memory_type="episodic", top_k=n_recent)
+        
         problems = []
         emotions = []
-        for doc in all_docs:
+        for mem in mems:
+            doc = mem['text']
             try:
+                # Try JSON first
                 data = json.loads(doc)
-                # Assume data has 'transcript' and 'tone'
-                transcript = data.get('transcript', '')
-                tone = data.get('tone', {})
-                sentiment = TextBlob(transcript).sentiment.polarity
-                emotions.append(sentiment)
-                # Simple keyword extraction for problems (negative words)
-                if sentiment < 0:
-                    words = nltk.word_tokenize(transcript.lower())
-                    problems.extend([w for w in words if w not in nltk.corpus.stopwords.words('english')])
+                transcript = data.get('transcript', doc)
             except:
-                continue
+                transcript = doc
+            
+            sentiment = TextBlob(transcript).sentiment.polarity
+            emotions.append(sentiment)
+            # Simple keyword extraction for problems (negative words)
+            if sentiment < 0:
+                words = nltk.word_tokenize(transcript.lower())
+                problems.extend([w for w in words if w not in nltk.corpus.stopwords.words('english') and len(w) > 3])
+        
         recurring_problems = Counter(problems).most_common(10)
         emotional_patterns = {
             'average_sentiment': sum(emotions) / len(emotions) if emotions else 0,
@@ -72,18 +81,25 @@ class UserLifeUnderstanding:
         Returns:
             str: Summary of the user's life story.
         """
-        all_docs = self.ltm.collection.get(limit=n_entries)['documents']
+        mems = self.memory_store.retrieve_memories(user_id=self.user_id, query="", memory_type="episodic", top_k=n_entries)
+        if not mems:
+            mems = self.memory_store.retrieve_memories(user_id=self.user_id, query="", memory_type="conversation", top_k=n_entries)
+            
         summaries = []
-        for doc in all_docs:
+        for mem in mems:
+            doc = mem['text']
             try:
                 data = json.loads(doc)
-                transcript = data.get('transcript', '')
+                transcript = data.get('transcript', doc)
                 summaries.append(transcript)
             except:
                 summaries.append(doc)
-        # Simple concatenation and summarization (in real, use better summarizer)
+        
+        if not summaries:
+            return "No life history recorded yet."
+
+        # Simple concatenation and summarization
         full_text = ' '.join(summaries)
-        # For now, return a basic summary
         blob = TextBlob(full_text)
         sentences = blob.sentences
         # Take first and last few sentences as summary
@@ -98,21 +114,31 @@ class UserLifeUnderstanding:
         Returns:
             dict: Emotional progress analysis.
         """
-        all_docs = self.ltm.collection.get(limit=n_entries)['documents']
+        # Retrieve from conversation logs
+        mems = self.memory_store.retrieve_memories(user_id=self.user_id, query="", memory_type="conversation", top_k=n_entries)
+        if not mems:
+            return {'progress': 'No data'}
+            
         sentiments = []
-        for doc in all_docs:
-            try:
-                data = json.loads(doc)
-                transcript = data.get('transcript', '')
-                sentiment = TextBlob(transcript).sentiment.polarity
-                sentiments.append(sentiment)
-            except:
-                continue
+        for mem in mems:
+            doc = mem['text']
+            # Simple sentiment analysis on the raw text
+            sentiment = TextBlob(doc).sentiment.polarity
+            sentiments.append(sentiment)
+            
         if not sentiments:
             return {'progress': 'No data'}
-        initial_avg = sum(sentiments[:len(sentiments)//2]) / (len(sentiments)//2) if sentiments else 0
-        recent_avg = sum(sentiments[len(sentiments)//2:]) / (len(sentiments) - len(sentiments)//2) if sentiments else 0
-        progress = 'improving' if recent_avg > initial_avg else 'declining' if recent_avg < initial_avg else 'stable'
+            
+        # Compare first half with second half (reverse chronological)
+        # mems are usually reverse chronological
+        recent_half = sentiments[:len(sentiments)//2]
+        older_half = sentiments[len(sentiments)//2:]
+        
+        initial_avg = sum(older_half) / len(older_half) if older_half else 0
+        recent_avg = sum(recent_half) / len(recent_half) if recent_half else 0
+        
+        progress = 'improving' if recent_avg > initial_avg + 0.05 else 'declining' if recent_avg < initial_avg - 0.05 else 'stable'
+        
         return {
             'initial_sentiment': initial_avg,
             'recent_sentiment': recent_avg,

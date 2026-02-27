@@ -31,7 +31,7 @@ def handle_text(text, pitch=None):
     print(f"🎵 Pitch: {pitch:.2f} Hz")
     print(f"🧠 Insight Strategy: {insight['recommended_strategy']}")
     if insight['triggers']:
-        print(f"⚠️ Triggers Found: {insight['triggers']}")
+        print(f"[WARNING] Triggers Found: {insight['triggers']}")
     
     # Pass everything to NLU (optional update for later)
     result = nlu_process(text, tone)

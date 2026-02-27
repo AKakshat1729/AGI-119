@@ -20,5 +20,8 @@ fastapi
 uvicorn
 pydantic
 httpx
-groq
- 
+google-generativeai
+Markupsafe>=2.1.3
+Werkzeug>=2.3.7
+sentence_transformers
+pandas
