@@ -131,8 +131,4 @@ Distributed under the MIT License.
 
 ---
 
-### 💡 Final Tip for your Project:
 
-Since your `app.py` has a very robust **MongoDB fallback to local JSON**, it would be a great idea to take a screenshot of your **Clinical Dashboard** or **Chat UI** and place it in an `assets/` folder in your repo. This makes the README look 10x more professional!
-
-**Would you like me to help you write a script to generate some "dummy" data so you can test and screenshot the Dashboard charts?**
