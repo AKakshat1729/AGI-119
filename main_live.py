@@ -5,11 +5,11 @@ import asyncio, threading, sys
 from perception.stt.stt_live import start_stt, stop_stream
 from perception.tone.tone_sentiment_live import analyze_tone
 from perception.nlu.nlu_live import nlu_process
-from perception.reasoning.insight import InsightGenerator
+from perception.reasoning.insight import TheraputicInsight
 # In main_live.py
 
 # Initialize the analyzer once
-insight_analyzer = InsightGenerator()
+insight_analyzer = TheraputicInsight()
 
 
 def handle_text(text, pitch=None):
@@ -31,7 +31,7 @@ def handle_text(text, pitch=None):
     print(f"🎵 Pitch: {pitch:.2f} Hz")
     print(f"🧠 Insight Strategy: {insight['recommended_strategy']}")
     if insight['triggers']:
-        print(f"⚠️ Triggers Found: {insight['triggers']}")
+        print(f"[WARNING] Triggers Found: {insight['triggers']}")
     
     # Pass everything to NLU (optional update for later)
     result = nlu_process(text, tone)

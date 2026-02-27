@@ -12,8 +12,16 @@ watchdog
 chromadb
 librosa
 assemblyai
-openai
 python-dotenv
 gtts
 pyttsx3
 pymongo
+fastapi
+uvicorn
+pydantic
+httpx
+google-generativeai
+Markupsafe>=2.1.3
+Werkzeug>=2.3.7
+sentence_transformers
+pandas

@@ -1,39 +1,33 @@
 #!/usr/bin/env python3
+"""
+Simple Flask app runner
+"""
 import os
 import sys
-import time
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
-import subprocess
+from dotenv import load_dotenv
 
-class RestartHandler(FileSystemEventHandler):
-    def __init__(self, script_path):
-        self.script_path = script_path
-        self.process = None
-        self.start_process()
+# Load environment
+load_dotenv()
 
-    def start_process(self):
-        if self.process:
-            self.process.terminate()
-            self.process.wait()
-        self.process = subprocess.Popen([sys.executable, self.script_path])
-
-    def on_modified(self, event):
-        if event.src_path.endswith('.py'):
-            print(f"Detected change in {event.src_path}, restarting...")
-            self.start_process()
-
-if __name__ == "__main__":
-    script_path = 'app.py'
-    event_handler = RestartHandler(script_path)
-    observer = Observer()
-    observer.schedule(event_handler, path='.', recursive=True)
-    observer.start()
-    try:
-        while True:
-            time.sleep(1)
-    except KeyboardInterrupt:
-        observer.stop()
-        if event_handler.process:
-            event_handler.process.terminate()
-    observer.join()
+# Import and run app
+try:
+    print("\n" + "="*60)
+    print("🏥 AI THERAPIST CHATBOT - STARTING")
+    print("="*60)
+    print("📍 Server: http://127.0.0.1:5000")
+    print("🔐 Login: http://127.0.0.1:5000/login")
+    print("="*60 + "\n")
+    
+    from app import app
+    app.run(
+        host='0.0.0.0',
+        port=5000,
+        debug=False,
+        use_reloader=False,
+        threaded=True
+    )
+except Exception as e:
+    print(f"❌ Error: {e}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)

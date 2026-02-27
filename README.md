@@ -1,101 +1,83 @@
-# AGI Therapist: Cognitive Architecture Project
+# AI Therapist Chatbot
 
-**Project:** AGI-119 / My-Virtual-Therapist
-**Type:** Advanced AI Cognitive System
+A responsive web-based AI therapist chatbot that combines speech-to-text analysis, natural language understanding, emotional reasoning, and long-term memory to provide therapeutic conversations.
 
-##  Project Overview
-This is not just a chatbot; it is a multi-modular **Cognitive Architecture** designed for automated therapeutic interaction. Unlike simple LLM wrappers, this system utilizes distinct modules for Perception, Memory, Reasoning, and Safety to create a "Hybrid Brain."
+## Features
 
-It features a **Unified Vector Memory** system that bridges different code modules into a single long-term storage, ensuring data consistency and context retention.
+- **Text and Audio Input**: Users can type messages or record audio for analysis
+- **Real-time Speech Recognition**: Converts audio to text using AssemblyAI
+- **Emotional Analysis**: Analyzes tone and sentiment from user input
+- **Memory Integration**: Maintains working memory and long-term memory for context
+- **Responsive Design**: Works on desktop and mobile devices
+- **Conversational AI**: Provides empathetic, therapeutic responses
 
----
+## How to Run
 
-##  Key Technical Features
+1. Install dependencies:
 
-### 1.  Unified Vector Memory (ChromaDB)
-- **Architecture:** Centralized Vector Database for Long-Term Memory.
-- **Data Bridging:** Solved "Split Brain" issues by bridging the `core` module (teammate's code) with the `memory` module into a single persistent database.
-- **Capabilities:** Semantic search, automatic timestamping, and cross-module retrieval.
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-### 2.  Ethical Safety & Perception
-- **Safety Gatekeeper:** A dedicated `EthicalAwarenessEngine` intercepts user input *before* processing. It detects high-risk phrases (e.g., self-harm) and overrides the system to provide immediate help.
-- **Style Engine:** Analyzes sentiment polarity to dynamically suggest response tones (Gentle, Calm, Positive).
+2. Start the Flask application:
 
-### 3.  Deep Reasoning (Internal Cognition)
-- **Intent Recognition:** Identifies "True Intent" (e.g., seeking support vs. seeking information) beyond simple keywords.
-- **Self-Reflection:** The system logs a self-critique of its own confidence levels and understanding after every interaction.
+   ```bash
+   python app.py
+   ```
 
-### 4.  Dynamic Prompt Engineering
-- **Context Construction:** Dynamically builds prompts using User History, Current Emotion, and Safety Constraints before sending them to the response generator.
+3. Open your browser and navigate to `http://127.0.0.1:5000`
 
----
+## Usage
 
-##  Installation & Setup
+- **Text Input**: Type your message in the text box and press Enter or click Send
+- **Audio Input**: Hold the microphone button to record audio, release to send
+- **Conversation Flow**: The AI therapist will respond with empathetic, context-aware messages
+
+## Architecture
+
+- **Frontend**: HTML/CSS/JavaScript chatbot interface
+- **Backend**: Flask web server
+- **Perception Module**: Speech-to-text (STT), tone analysis, natural language understanding (NLU)
+- **Memory Module**: Working memory and long-term memory using ChromaDB
+- **Reasoning Module**: User life understanding, emotional reasoning, ethical awareness
+
+## API Endpoints
+
+- `GET /`: Main chatbot interface
+- `POST /start_conversation`: Initialize a new conversation
+- `POST /analyze`: Analyze user input (text or audio) and generate response
+
+## Future Enhancements
+
+- User authentication and session management
+- Advanced conversation flow management
+- Integration with additional therapeutic techniques
+- Multi-language support
+- Voice synthesis for AI responses
+# My-Virtual-Therapist
+
+
+
+A Python project with a simple entrypoint (`app.py`).  
+This README covers how to setup and run the project.
+
+## 📦 Requirements
+
+Make sure you have the following installed:
+
+- Python **3.8+**
+- `pip` (Python package manager)
+
+## 🛠️ Setup
 
 1. **Clone the repository**
    ```bash
-   git clone [https://github.com/AKakshat1729/AGI-119.git](https://github.com/AKakshat1729/AGI-119.git)
+   git clone https://github.com/AKakshat1729/AGI-119.git
    cd AGI-119
-
-
-#Create a Virtual Environment
-
-# Windows
-python -m venv venv
-venv\Scripts\activate
-
-# Linux / macOS
-python3 -m venv venv
-source venv/bin/activate
-
-
-#Install Dependencies
-
-pip install -r requirements.txt
-
-#How to Run the Demo
-#Step 1: Verify Backend & Memory Integrity
-
-python verify_memory.py
-
-#Launch the Cognitive Engine (The App)
-
-#Step 2 : python app.py
-
-Open your browser at http://127.0.0.1:5000
-
-Test Emotional Intelligence: Type "I am feeling stressed but I will handle it." (Observe "Neutral/Balanced" style in terminal).
-
-Test Safety Protocol: Type "I want to kill myself." (Observe !!! HIGH RISK DETECTED in terminal).
-
-
-Step 3: Audit Patient History
-
-After stopping the app (Ctrl+C)
-
-
-python view_history.py
-
- Architecture Structure
-frontend/: HTML/CSS/JavaScript interface.
-
-perception/: STT (AssemblyAI) and NLU processing.
-
-memory/: ChromaDB Vector Database logic.
-
-reasoning/: Internal Cognition and Insight Generators.
-
-core/: Shared utilities (Safety, Style engines).
-
-generation/: Prompt construction and LLM interfacing.
-
-api/: External API handlers.
-
- Future Enhancements
-User Authentication & Multi-user session management.
-
-Voice Synthesis (TTS) for audio responses.
-
-Advanced Cognitive Behavioral Therapy (CBT) modules.
-
-
+2. python3 -m venv venv
+source venv/bin/activate   # Linux / macOS
+venv\Scripts\activate      # Windows
+3. **install requirements**
+   pip install -r requirements.txt
+4. **Run the app**
+   python app.py

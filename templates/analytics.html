@@ -1,0 +1,968 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGI-119 | Clinical Analytics Dashboard</title>
+    <meta name="description" content="Comprehensive therapy analytics — session timeline, emotional progress, medical profile, and emergency safety contacts.">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <style>
+        /* ── Design Tokens ───────────────────────────────── */
+        :root {
+            --bg:       #060a18;
+            --bg-card:  rgba(12, 20, 50, 0.88);
+            --border:   rgba(0, 243, 255, 0.11);
+            --accent:   #00f3ff;
+            --purple:   #7c3aed;
+            --green:    #10b981;
+            --amber:    #f59e0b;
+            --red:      #ef4444;
+            --text:     #e2e8f0;
+            --muted:    #64748b;
+            --radius:   14px;
+            --glow:     0 0 28px rgba(0,243,255,0.15);
+            --font:     'Inter', sans-serif;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html { scroll-behavior: smooth; }
+        body {
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--font);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+        body::before {
+            content: '';
+            position: fixed; inset: 0; z-index: -1;
+            background:
+                radial-gradient(ellipse at 10% 15%, rgba(124,58,237,.14) 0%, transparent 50%),
+                radial-gradient(ellipse at 90% 85%, rgba(0,243,255,.09) 0%, transparent 50%),
+                radial-gradient(ellipse at 50% 50%, rgba(16,185,129,.04) 0%, transparent 60%);
+        }
+
+        /* ── Nav ─────────────────────────────────────────── */
+        .nav {
+            position: sticky; top: 0; z-index: 100;
+            display: flex; align-items: center; gap: 16px;
+            padding: 16px 28px;
+            background: rgba(6,10,24,.96);
+            border-bottom: 1px solid var(--border);
+            backdrop-filter: blur(18px);
+        }
+        .nav-brand { display: flex; align-items: center; gap: 10px; color: var(--accent); font-size: 1.1rem; font-weight: 700; text-decoration: none; }
+        .nav-title { color: var(--muted); font-size: 0.9rem; border-left: 1px solid var(--border); padding-left: 14px; }
+        .nav-spacer { flex: 1; }
+        .nav-btn {
+            display: flex; align-items: center; gap: 7px;
+            padding: 8px 15px; border-radius: 8px; font-size: 0.83rem; font-weight: 500;
+            cursor: pointer; border: 1px solid var(--border); transition: all .2s;
+            text-decoration: none;
+        }
+        .nav-btn.primary { background: rgba(0,243,255,.07); color: var(--accent); }
+        .nav-btn.secondary { background: rgba(124,58,237,.1); color: #a78bfa; border-color: rgba(124,58,237,.3); }
+        .nav-btn:hover { filter: brightness(1.2); box-shadow: var(--glow); }
+        .nav-btn i.spin { animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        /* ── Layout ──────────────────────────────────────── */
+        .wrap { max-width: 1380px; margin: 0 auto; padding: 26px 22px 70px; }
+
+        /* ── Section titles ──────────────────────────────── */
+        .section-title {
+            font-size: 0.72rem; font-weight: 700; letter-spacing: .12em;
+            text-transform: uppercase; color: var(--muted);
+            margin: 28px 0 14px;
+            display: flex; align-items: center; gap: 10px;
+        }
+        .section-title::after {
+            content: ''; flex: 1; height: 1px; background: var(--border);
+        }
+
+        /* ── KPI Strip ───────────────────────────────────── */
+        .kpi-strip {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(165px, 1fr));
+            gap: 14px; margin-bottom: 6px;
+        }
+        .kpi {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 18px 16px;
+            position: relative; overflow: hidden;
+            transition: transform .2s, box-shadow .2s;
+        }
+        .kpi:hover { transform: translateY(-3px); box-shadow: var(--glow); }
+        .kpi::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+        .kpi.c1::before { background: linear-gradient(90deg, var(--accent), transparent); }
+        .kpi.c2::before { background: linear-gradient(90deg, var(--purple), transparent); }
+        .kpi.c3::before { background: linear-gradient(90deg, var(--green), transparent); }
+        .kpi.c4::before { background: linear-gradient(90deg, var(--amber), transparent); }
+        .kpi.c5::before { background: linear-gradient(90deg, var(--red), transparent); }
+        .kpi-lbl { font-size: .72rem; color: var(--muted); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 9px; }
+        .kpi-val { font-size: 1.85rem; font-weight: 800; line-height: 1; margin-bottom: 5px; }
+        .kpi-sub { font-size: .75rem; color: var(--muted); }
+        .kpi-ico { position: absolute; top: 14px; right: 14px; font-size: 1.3rem; opacity: .15; }
+        .kpi.c1 .kpi-val { color: var(--accent); }
+        .kpi.c2 .kpi-val { color: #a78bfa; }
+        .kpi.c3 .kpi-val { color: var(--green); }
+        .kpi.c4 .kpi-val { color: var(--amber); }
+        .kpi.c5 .kpi-val { color: var(--red); }
+
+        /* ── Grid ────────────────────────────────────────── */
+        .grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 16px; margin-bottom: 16px; }
+        .g12 { grid-column: span 12; }
+        .g8  { grid-column: span 8; }
+        .g6  { grid-column: span 6; }
+        .g4  { grid-column: span 4; }
+        @media (max-width: 1024px) { .g8,.g6 { grid-column: span 12; } .g4 { grid-column: span 6; } }
+        @media (max-width: 640px)  { .g4,.g6,.g8,.g12 { grid-column: span 12; } }
+
+        /* ── Card ────────────────────────────────────────── */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+        }
+        .card-head {
+            display: flex; align-items: center; gap: 10px; margin-bottom: 18px;
+        }
+        .card-head h3 { font-size: .88rem; font-weight: 600; }
+        .card-head i { color: var(--accent); font-size: .9rem; opacity: .75; }
+        .card-head .badge {
+            margin-left: auto; font-size: .68rem; padding: 3px 9px;
+            border-radius: 20px; background: rgba(0,243,255,.09);
+            border: 1px solid rgba(0,243,255,.2); color: var(--accent);
+        }
+        .chart-wrap { position: relative; min-height: 220px; }
+
+        /* ── Gauge ───────────────────────────────────────── */
+        .gauge-outer { display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; gap: 8px; padding: 10px 0; }
+        .gauge-ring  { position: relative; width: 130px; height: 130px; }
+        .gauge-ring svg { width: 100%; height: 100%; transform: rotate(-90deg); }
+        .gauge-ring .gtrack { fill: none; stroke: rgba(255,255,255,.06); stroke-width: 11; }
+        .gauge-ring .gfill  { fill: none; stroke-width: 11; stroke-linecap: round;
+            stroke-dasharray: 326.73;
+            transition: stroke-dashoffset 1.3s cubic-bezier(.4,0,.2,1); }
+        .gauge-center { position: absolute; inset:0; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .gauge-num  { font-size: 1.5rem; font-weight: 700; color: var(--accent); }
+        .gauge-unit { font-size: .65rem; color: var(--muted); }
+        .gauge-desc { font-size: .78rem; color: var(--muted); text-align: center; margin-top: 4px; }
+
+        /* ── Heatmap ─────────────────────────────────────── */
+        .heatmap { display: grid; grid-template-columns: repeat(7,1fr); gap: 3px; }
+        .hm-cell { aspect-ratio: 1; border-radius: 3px; cursor: default; transition: transform .15s; }
+        .hm-cell:hover { transform: scale(1.3); z-index: 2; }
+        .hm-legend { display: flex; align-items: center; gap: 6px; margin-top: 8px; font-size: .7rem; color: var(--muted); }
+        .hm-legend .sw { width: 11px; height: 11px; border-radius: 2px; }
+
+        /* ── Timeline ────────────────────────────────────── */
+        .timeline { display: flex; flex-direction: column; gap: 12px; max-height: 420px; overflow-y: auto; padding-right: 4px; }
+        .timeline::-webkit-scrollbar { width: 4px; }
+        .timeline::-webkit-scrollbar-track { background: transparent; }
+        .timeline::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 4px; }
+        .tl-item {
+            display: flex; align-items: flex-start; gap: 12px;
+            background: rgba(255,255,255,.03);
+            border: 1px solid rgba(255,255,255,.06);
+            border-radius: 10px; padding: 12px; position: relative;
+            transition: border-color .2s, box-shadow .2s;
+        }
+        .tl-item:hover { border-color: rgba(0,243,255,.2); box-shadow: 0 0 16px rgba(0,243,255,.08); }
+        .tl-dot {
+            width: 38px; height: 38px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: .9rem; flex-shrink: 0;
+            color: #000;
+        }
+        .tl-body { flex: 1; min-width: 0; }
+        .tl-header { display: flex; justify-content: space-between; margin-bottom: 4px; }
+        .tl-title  { font-weight: 600; font-size: .88rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 260px; }
+        .tl-date   { font-size: .75rem; color: var(--muted); flex-shrink: 0; }
+        .tl-summary { font-size: .82rem; color: #94a3b8; margin-bottom: 6px; }
+        .tl-tags   { display: flex; gap: 6px; flex-wrap: wrap; }
+        .tl-tag {
+            font-size: .7rem; padding: 2px 8px; border-radius: 10px;
+            background: rgba(0,0,0,.25);
+        }
+        .tag-mood-anxiety  { background: rgba(239,68,68,.18);  color: #fca5a5; }
+        .tag-mood-positive { background: rgba(16,185,129,.18); color: #6ee7b7; }
+        .tag-mood-neutral  { background: rgba(100,116,139,.18);color: #94a3b8; }
+        .tag-mood-stress   { background: rgba(245,158,11,.18); color: #fcd34d; }
+        .tag-mood-depression{ background: rgba(99,102,241,.18);color: #a5b4fc; }
+
+        /* ── Safety Panel ────────────────────────────────── */
+        .safety-card {
+            border: 1px solid rgba(239,68,68,.22);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+        .safety-header {
+            background: rgba(239,68,68,.12);
+            padding: 14px 20px;
+            display: flex; align-items: center; gap: 12px;
+            border-bottom: 1px solid rgba(239,68,68,.15);
+        }
+        .safety-header i { color: var(--red); font-size: 1.05rem; }
+        .safety-header h3 { font-size: .9rem; font-weight: 600; }
+        .safety-header .toggle-btn {
+            margin-left: auto; background: rgba(239,68,68,.15);
+            border: 1px solid rgba(239,68,68,.25); color: var(--red);
+            padding: 5px 12px; border-radius: 6px; cursor: pointer;
+            font-size: .75rem; transition: all .2s;
+        }
+        .safety-header .toggle-btn:hover { background: rgba(239,68,68,.28); }
+        .safety-body { padding: 18px 20px; }
+        .safety-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; margin-bottom: 16px; }
+        .contact-card {
+            background: rgba(239,68,68,.06);
+            border: 1px solid rgba(239,68,68,.12);
+            border-radius: 10px; padding: 14px;
+            transition: border-color .2s;
+        }
+        .contact-card:hover { border-color: rgba(239,68,68,.3); }
+        .contact-name { font-size: .85rem; font-weight: 600; margin-bottom: 5px; }
+        .contact-detail { font-size: .82rem; color: #fca5a5; font-weight: 500; }
+        .tips-section { margin-top: 14px; }
+        .tips-title { font-size: .78rem; font-weight: 600; color: var(--amber); margin-bottom: 8px; }
+        .tip-item { display: flex; gap: 8px; font-size: .8rem; color: #94a3b8; margin-bottom: 6px; align-items: flex-start; }
+        .tip-item::before { content: '▹'; color: var(--amber); flex-shrink: 0; }
+        .risk-alerts-list { margin-top: 14px; display: flex; flex-direction: column; gap: 8px; }
+        .alert-row {
+            display: flex; align-items: center; gap: 12px;
+            background: rgba(239,68,68,.06);
+            border: 1px solid rgba(239,68,68,.12);
+            border-radius: 8px; padding: 10px 12px;
+        }
+        .alert-sev { padding: 2px 8px; border-radius: 20px; font-size: .7rem; font-weight: 700; flex-shrink: 0; }
+        .sev-HIGH     { background: rgba(239,68,68,.22); color: #ef4444; }
+        .sev-MODERATE { background: rgba(245,158,11,.22); color: #f59e0b; }
+        .alert-info { flex: 1; }
+        .alert-cats { font-size: .78rem; color: #fca5a5; }
+        .alert-ts   { font-size: .7rem; color: var(--muted); margin-top: 2px; }
+
+        /* ── Medical Report ───────────────────────────────── */
+        .report-tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--border); }
+        .rtab {
+            padding: 8px 16px; background: none; border: none;
+            color: var(--muted); cursor: pointer; font-size: .85rem; font-weight: 500;
+            border-bottom: 2px solid transparent; transition: all .2s;
+        }
+        .rtab.active { color: var(--accent); border-bottom-color: var(--accent); }
+        .report-panel { display: none; }
+        .report-panel.active { display: block; }
+        .report-list { display: flex; flex-direction: column; gap: 7px; max-height: 300px; overflow-y: auto; }
+        .report-list::-webkit-scrollbar { width: 4px; }
+        .report-list::-webkit-scrollbar-thumb { background: rgba(255,255,255,.08); border-radius: 4px; }
+        .report-item {
+            background: rgba(255,255,255,.03);
+            border: 1px solid rgba(255,255,255,.06);
+            border-radius: 8px; padding: 10px 12px;
+            font-size: .83rem; line-height: 1.5;
+            transition: border-color .2s;
+        }
+        .report-item:hover { border-color: rgba(0,243,255,.18); }
+        .report-item.risk { border-color: rgba(239,68,68,.2); background: rgba(239,68,68,.05); }
+        .report-empty {
+            text-align: center; padding: 30px;
+            color: var(--muted); font-size: .85rem;
+        }
+        .report-empty i { font-size: 1.6rem; display: block; margin-bottom: 8px; color: var(--accent); opacity: .4; }
+
+        /* ── Skeleton ────────────────────────────────────── */
+        .skel {
+            background: linear-gradient(90deg, rgba(255,255,255,.04) 25%, rgba(255,255,255,.09) 50%, rgba(255,255,255,.04) 75%);
+            background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 6px;
+        }
+        @keyframes shimmer { to { background-position: -200% 0; } }
+
+        /* ── Stat pills ──────────────────────────────────── */
+        .stat-pills { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 10px; }
+        .stat-pill {
+            background: rgba(255,255,255,.04);
+            border: 1px solid rgba(255,255,255,.08);
+            border-radius: 8px; padding: 8px 14px;
+            font-size: .8rem;
+        }
+        .stat-pill b { color: var(--accent); }
+
+        /* ── Footer ──────────────────────────────────────── */
+        .footer {
+            text-align: center; padding-top: 14px;
+            border-top: 1px solid var(--border);
+            color: var(--muted); font-size: .75rem;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── Nav ──────────────────────────────────────────────── -->
+<nav class="nav">
+    <a href="/" class="nav-brand"><i class="fa-solid fa-brain"></i> AGI-119</a>
+    <span class="nav-title">Clinical Analytics Dashboard</span>
+    <div class="nav-spacer"></div>
+    <button class="nav-btn secondary" id="refresh-btn" onclick="loadAll()">
+        <i class="fa-solid fa-rotate-right" id="refresh-ico"></i> Refresh
+    </button>
+    <a href="/" class="nav-btn primary"><i class="fa-solid fa-arrow-left"></i> Therapy</a>
+</nav>
+
+<div class="wrap">
+
+    <!-- ── KPI Strip ──────────────────────────────────────── -->
+    <p class="section-title"><i class="fa-solid fa-gauge"></i> Live Metrics</p>
+    <div class="kpi-strip" id="kpi-strip">
+        <div class="kpi c1 skel" style="min-height:105px;"></div>
+        <div class="kpi c2 skel" style="min-height:105px;"></div>
+        <div class="kpi c3 skel" style="min-height:105px;"></div>
+        <div class="kpi c4 skel" style="min-height:105px;"></div>
+        <div class="kpi c5 skel" style="min-height:105px;"></div>
+    </div>
+
+    <!-- ── Statistical Summary ───────────────────────────── -->
+    <div id="stat-pills-row"></div>
+
+    <!-- ── Row 1: Anxiety trend + Category pie ───────────── -->
+    <p class="section-title"><i class="fa-solid fa-chart-line"></i> Emotional Analytics</p>
+    <div class="grid">
+        <div class="card g8">
+            <div class="card-head"><i class="fa-solid fa-chart-line"></i><h3>Anxiety Score Trend</h3><span class="badge" id="trend-badge">All Sessions</span></div>
+            <div class="chart-wrap"><canvas id="anxietyChart"></canvas></div>
+        </div>
+        <div class="card g4">
+            <div class="card-head"><i class="fa-solid fa-chart-pie"></i><h3>Session Categories</h3></div>
+            <div class="chart-wrap"><canvas id="categoryChart"></canvas></div>
+        </div>
+    </div>
+
+    <!-- ── Row 2: Gauge + Progress + Stressor pie ──────── -->
+    <div class="grid">
+        <div class="card g4">
+            <div class="card-head"><i class="fa-solid fa-gauge-high"></i><h3>Mood Stability</h3></div>
+            <div class="chart-wrap" style="min-height:230px;">
+                <div class="gauge-outer">
+                    <div class="gauge-ring">
+                        <svg viewBox="0 0 120 120">
+                            <defs>
+                                <linearGradient id="gg" x1="0%" y1="0%" x2="100%" y2="0%">
+                                    <stop offset="0%" stop-color="#00f3ff"/>
+                                    <stop offset="100%" stop-color="#7c3aed"/>
+                                </linearGradient>
+                            </defs>
+                            <circle class="gtrack" cx="60" cy="60" r="52"/>
+                            <circle class="gfill" cx="60" cy="60" r="52" id="gfill" stroke="url(#gg)" stroke-dashoffset="326.73"/>
+                        </svg>
+                        <div class="gauge-center">
+                            <span class="gauge-num" id="g-num">—</span>
+                            <span class="gauge-unit">/ 1.00</span>
+                        </div>
+                    </div>
+                    <p class="gauge-desc" id="g-desc">Loading…</p>
+                </div>
+            </div>
+        </div>
+        <div class="card g4">
+            <div class="card-head"><i class="fa-solid fa-chart-simple"></i><h3>Therapy Progress Score</h3></div>
+            <div class="chart-wrap" style="min-height:230px;"><canvas id="progressChart"></canvas></div>
+        </div>
+        <div class="card g4">
+            <div class="card-head"><i class="fa-solid fa-magnifying-glass-chart"></i><h3>Dominant Stressors</h3></div>
+            <div class="chart-wrap" style="min-height:230px;"><canvas id="stressorChart"></canvas></div>
+        </div>
+    </div>
+
+    <!-- ── Row 3: Topic bar + Heatmap ─────────────────── -->
+    <div class="grid">
+        <div class="card g6">
+            <div class="card-head"><i class="fa-solid fa-bars"></i><h3>Topic Frequency</h3><span class="badge">All Sessions</span></div>
+            <div class="chart-wrap"><canvas id="topicChart"></canvas></div>
+        </div>
+        <div class="card g6">
+            <div class="card-head"><i class="fa-solid fa-fire-flame-curved"></i><h3>Emotional Volatility Heatmap</h3></div>
+            <div class="chart-wrap" style="min-height:180px; padding-top:10px;">
+                <div class="heatmap" id="heatmap-grid"></div>
+                <div class="hm-legend">
+                    <span>Low</span>
+                    <div class="sw" style="background:#10b981;"></div>
+                    <div class="sw" style="background:#f59e0b;"></div>
+                    <div class="sw" style="background:#ef4444;"></div>
+                    <span>High</span>
+                    <span style="margin-left:auto;" id="hm-count"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Improvement Trend ─────────────────────────────── -->
+    <div class="grid">
+        <div class="card g12">
+            <div class="card-head"><i class="fa-solid fa-arrow-trend-up"></i><h3>Improvement Trend — Positive Session Rate Over Time</h3></div>
+            <div class="chart-wrap" style="min-height:200px;"><canvas id="improvChart"></canvas></div>
+        </div>
+    </div>
+
+    <!-- ── Safiya's Task: Session Timeline ───────────────── -->
+    <p class="section-title"><i class="fa-solid fa-timeline"></i> Session Timeline</p>
+    <div class="card" style="padding-bottom: 24px;">
+        <div class="card-head">
+            <i class="fa-solid fa-calendar-days"></i>
+            <h3>Past Therapy Sessions</h3>
+            <span class="badge" id="session-count-badge">Loading…</span>
+        </div>
+        <div class="timeline" id="timeline-list">
+            <div style="text-align:center; padding:20px; color:var(--muted);">Loading sessions…</div>
+        </div>
+    </div>
+
+    <!-- ── Iqra's Task: Medical Report ───────────────────── -->
+    <p class="section-title"><i class="fa-solid fa-file-medical"></i> Medical Profile & Memory</p>
+    <div class="card">
+        <div class="report-tabs">
+            <button class="rtab active" onclick="switchRTab('medical', this)">🏥 Medical History</button>
+            <button class="rtab" onclick="switchRTab('personal', this)">👤 Personal Profile</button>
+            <button class="rtab" onclick="switchRTab('risk', this)">⚠️ Risk Flags</button>
+        </div>
+
+        <div class="report-panel active" id="rpanel-medical">
+            <div class="report-list" id="medical-list">
+                <div class="report-empty"><i class="fa-solid fa-stethoscope"></i>Loading medical profile…</div>
+            </div>
+        </div>
+        <div class="report-panel" id="rpanel-personal">
+            <div class="report-list" id="personal-list">
+                <div class="report-empty"><i class="fa-solid fa-user"></i>Loading personal profile…</div>
+            </div>
+        </div>
+        <div class="report-panel" id="rpanel-risk">
+            <div class="report-list" id="risk-list-report">
+                <div class="report-empty"><i class="fa-solid fa-shield-check" style="color:var(--green);"></i>Checking for risk flags…</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Akshat's Task: Safety Module ──────────────────── -->
+    <p class="section-title"><i class="fa-solid fa-shield-heart"></i> Safety & Emergency Support</p>
+    <div class="safety-card">
+        <div class="safety-header">
+            <i class="fa-solid fa-triangle-exclamation"></i>
+            <h3>Emergency Contacts & Crisis Resources</h3>
+            <button class="toggle-btn" onclick="toggleSafety()" id="safety-toggle">
+                <i class="fa-solid fa-chevron-down"></i> Show Resources
+            </button>
+        </div>
+        <div id="safety-body" style="display:none;">
+            <div class="safety-body">
+                <!-- Risk Alerts -->
+                <div id="active-alerts-section" style="display:none; margin-bottom:18px;">
+                    <p style="font-size:.82rem; font-weight:600; color:var(--red); margin-bottom:8px;">
+                        <i class="fa-solid fa-circle-exclamation"></i> Active Risk Alerts
+                    </p>
+                    <div class="risk-alerts-list" id="active-alerts"></div>
+                </div>
+
+                <!-- Emergency Contacts Grid -->
+                <p style="font-size:.82rem; font-weight:600; color:var(--amber); margin-bottom:12px;">
+                    <i class="fa-solid fa-phone-flip"></i> Crisis Helplines — Available 24/7
+                </p>
+                <div class="safety-grid" id="contacts-grid">
+                    <!-- Injected by JS -->
+                </div>
+
+                <!-- Safety Tips -->
+                <div class="tips-section">
+                    <p class="tips-title"><i class="fa-solid fa-lightbulb"></i> Immediate Safety Steps</p>
+                    <div id="tips-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="footer" style="margin-top:28px;">
+        <span id="last-updated">Loading…</span> &nbsp;·&nbsp;
+        All analytics run locally — zero external API calls &nbsp;·&nbsp;
+        Powered by numpy + pandas
+    </div>
+
+</div>
+
+<!-- ── Script ────────────────────────────────────────────── -->
+<script>
+const charts = {};
+let safetyOpen = false;
+
+// ── Palette ─────────────────────────────────────────────
+const P = ['#00f3ff','#7c3aed','#10b981','#f59e0b','#ef4444',
+           '#3b82f6','#ec4899','#14b8a6','#8b5cf6','#f97316'];
+
+function rgba(hex, a) {
+    const r = parseInt(hex.slice(1,3),16), g = parseInt(hex.slice(3,5),16), b = parseInt(hex.slice(5,7),16);
+    return `rgba(${r},${g},${b},${a})`;
+}
+
+Chart.defaults.color = '#64748b';
+Chart.defaults.borderColor = 'rgba(255,255,255,0.05)';
+Chart.defaults.font.family = 'Inter';
+
+function humanLabel(s) { return (s||'').replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase()); }
+function fmtDate(ts)   { if(!ts) return '—'; const d=new Date(ts); return isNaN(d)?ts:d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
+function fmtDt(ts)     { if(!ts) return '—'; const d=new Date(ts); return isNaN(d)?ts:d.toLocaleString(); }
+function kill(k)       { if(charts[k]){ charts[k].destroy(); delete charts[k]; } }
+
+// ── Fetch ────────────────────────────────────────────────
+async function loadAll() {
+    const ico = document.getElementById('refresh-ico');
+    document.getElementById('refresh-btn').disabled = true;
+    ico.classList.add('spin');
+
+    try {
+        const [dashRes, timeRes, reportRes] = await Promise.all([
+            fetch('/api/user-therapy-analytics', {cache:'no-store'}),
+            fetch('/api/dashboard/timeline',      {cache:'no-store'}),
+            fetch('/api/dashboard/report',         {cache:'no-store'}),
+        ]);
+
+        const dash   = dashRes.ok   ? await dashRes.json()   : {success:false};
+        const time   = timeRes.ok   ? await timeRes.json()   : {success:false};
+        const report = reportRes.ok ? await reportRes.json() : {success:false};
+
+        if (dash.success)   renderDash(dash);
+        else                loadDemo();
+        if (time.success)   renderTimeline(time.timeline || []);
+        if (report.success) renderReport(report.report || {});
+
+        document.getElementById('last-updated').textContent =
+            'Last updated: ' + new Date().toLocaleTimeString();
+
+    } catch(e) {
+        console.error(e);
+        loadDemo();
+    } finally {
+        document.getElementById('refresh-btn').disabled = false;
+        ico.classList.remove('spin');
+    }
+}
+
+// ── Demo fallback ────────────────────────────────────────
+function loadDemo() {
+    const demo = {
+        success: true, total_sessions: 8,
+        mood_stability_index: 0.61,
+        therapy_progress_score: 0.14,
+        emotional_volatility: 0.08,
+        dominant_stressor: 'academic_pressure',
+        most_frequent_topic: 'academic_pressure',
+        statistical_summary: { mean_confidence:0.52, std_confidence:0.18, median_confidence:0.50, session_count:8 },
+        anxiety_trend: [...Array(8)].map((_,i)=>({ date: new Date(Date.now()-(7-i)*864e5).toISOString().slice(0,10), score: +(Math.random()*0.7+0.1).toFixed(3) })),
+        smoothed_anxiety_trend: [...Array(8)].map((_,i)=>({ date: new Date(Date.now()-(7-i)*864e5).toISOString().slice(0,10), score: +(Math.random()*0.5+0.2).toFixed(3) })),
+        improvement_trend: [...Array(6)].map((_,i)=>({ date: new Date(Date.now()-(5-i)*864e5).toISOString().slice(0,10), score: +(i/8).toFixed(3) })),
+        session_category_breakdown: {anxiety:4, positive:2, neutral:2},
+        topic_frequency: {academic_pressure:5, insomnia:3, social_anxiety:2, burnout:2, loneliness:1},
+        heatmap_data: [...Array(8)].map((_,i)=>({ date:'', emotion:'anxiety', score:+(Math.random()).toFixed(2) })),
+        risk_alerts: [],
+        emergency_resources: { '🆘 Suicide & Crisis Lifeline (US)':'Call or text 988', '🇮🇳 iCall (India)':'9152987821', '🚨 Emergency Services':'911 / 112 / 100' },
+        safety_tips: ['Reach out to a trusted friend.','Move to a safe space.','Call a crisis line 24/7.']
+    };
+    renderDash(demo);
+    renderTimeline([]);
+    renderReport({medical_history:['No medical records found.'],personal_profile:['No personal data yet.'],risk_flags:[]});
+}
+
+// ── Render Dashboard ─────────────────────────────────────
+function renderDash(d) {
+    renderKPIs(d);
+    renderStatPills(d.statistical_summary || {});
+    renderAnxiety(d.anxiety_trend||[], d.smoothed_anxiety_trend||[]);
+    renderCategoryPie(d.session_category_breakdown||{});
+    renderGauge(d.mood_stability_index||0);
+    renderProgress(d.therapy_progress_score||0);
+    renderStressor(d.topic_frequency||{});
+    renderTopicBar(d.topic_frequency||{});
+    renderHeatmap(d.heatmap_data||d.anxiety_trend||[]);
+    renderImprovement(d.improvement_trend||[]);
+    renderSafety(d.risk_alerts||[], d.emergency_resources||{}, d.safety_tips||[]);
+
+    document.getElementById('trend-badge').textContent =
+        `${d.total_sessions||0} Sessions`;
+}
+
+// ── KPIs ─────────────────────────────────────────────────
+function renderKPIs(d) {
+    const tps = d.therapy_progress_score||0;
+    const ra  = (d.risk_alerts||[]).length;
+    document.getElementById('kpi-strip').innerHTML = `
+        <div class="kpi c1">
+            <i class="fa-solid fa-dna kpi-ico"></i>
+            <div class="kpi-lbl">Total Sessions</div>
+            <div class="kpi-val">${d.total_sessions||0}</div>
+            <div class="kpi-sub">Tracked conversations</div>
+        </div>
+        <div class="kpi c3">
+            <i class="fa-solid fa-arrow-trend-up kpi-ico"></i>
+            <div class="kpi-lbl">Progress Score</div>
+            <div class="kpi-val">${(tps*100).toFixed(0)}<small style="font-size:1rem">%</small></div>
+            <div class="kpi-sub">${tps>=0?'▲ Positive trend':'▼ Needs attention'}</div>
+        </div>
+        <div class="kpi c2">
+            <i class="fa-solid fa-gauge-high kpi-ico"></i>
+            <div class="kpi-lbl">Mood Stability</div>
+            <div class="kpi-val">${((d.mood_stability_index||0)*100).toFixed(0)}<small style="font-size:1rem">%</small></div>
+            <div class="kpi-sub">Higher = more stable</div>
+        </div>
+        <div class="kpi c4">
+            <i class="fa-solid fa-wave-square kpi-ico"></i>
+            <div class="kpi-lbl">Volatility Index</div>
+            <div class="kpi-val">${(d.emotional_volatility||0).toFixed(3)}</div>
+            <div class="kpi-sub">Emotion swing variance</div>
+        </div>
+        <div class="kpi c5">
+            <i class="fa-solid fa-triangle-exclamation kpi-ico"></i>
+            <div class="kpi-lbl">Risk Alerts</div>
+            <div class="kpi-val">${ra}</div>
+            <div class="kpi-sub">${ra===0?'✓ No active risks':'⚠ Review required'}</div>
+        </div>
+    `;
+}
+
+// ── Stat pills ───────────────────────────────────────────
+function renderStatPills(stats) {
+    if (!Object.keys(stats).length) return;
+    document.getElementById('stat-pills-row').innerHTML = `
+        <div class="stat-pills" style="margin-bottom:16px;">
+            <div class="stat-pill">Mean Confidence <b>${(stats.mean_confidence||0).toFixed(3)}</b></div>
+            <div class="stat-pill">Std Dev <b>${(stats.std_confidence||0).toFixed(3)}</b></div>
+            <div class="stat-pill">Median <b>${(stats.median_confidence||0).toFixed(3)}</b></div>
+            <div class="stat-pill">Sessions Analysed <b>${stats.session_count||0}</b></div>
+        </div>
+    `;
+}
+
+// ── Anxiety Trend ────────────────────────────────────────
+function renderAnxiety(trend, smoothed) {
+    kill('anxiety');
+    if (!trend.length) return;
+    charts.anxiety = new Chart(document.getElementById('anxietyChart'), {
+        type: 'line',
+        data: {
+            labels: trend.map(t=>fmtDate(t.date)),
+            datasets: [
+                { label:'Anxiety Score', data: trend.map(t=>t.score),
+                  borderColor:'#00f3ff', backgroundColor:rgba('#00f3ff',.07),
+                  borderWidth:2.5, pointRadius:3.5, pointBackgroundColor:'#00f3ff',
+                  tension:.4, fill:true },
+                { label:'Smoothed (MA-3)', data: smoothed.map(t=>t.score),
+                  borderColor:rgba('#7c3aed',.8), borderWidth:2, borderDash:[5,4],
+                  pointRadius:0, tension:.45, fill:false },
+            ]
+        },
+        options: {
+            responsive:true, maintainAspectRatio:false,
+            plugins: { legend:{ labels:{color:'#94a3b8',boxWidth:14} }, tooltip:{mode:'index',intersect:false} },
+            scales: {
+                x: { grid:{color:'rgba(255,255,255,.04)'}, ticks:{maxRotation:45} },
+                y: { min:0, max:1, grid:{color:'rgba(255,255,255,.04)'} }
+            }
+        }
+    });
+}
+
+// ── Category Pie ─────────────────────────────────────────
+function renderCategoryPie(cats) {
+    kill('category');
+    const labs = Object.keys(cats).map(humanLabel);
+    const data = Object.values(cats);
+    const cols = ['#ef4444','#10b981','#64748b'];
+    charts.category = new Chart(document.getElementById('categoryChart'), {
+        type:'doughnut',
+        data:{ labels:labs, datasets:[{data, backgroundColor:cols, borderWidth:0, hoverOffset:10}] },
+        options:{
+            responsive:true, maintainAspectRatio:false, cutout:'65%',
+            plugins:{ legend:{position:'bottom', labels:{color:'#94a3b8',boxWidth:11,padding:12,font:{size:10}}} }
+        }
+    });
+}
+
+// ── Gauge ─────────────────────────────────────────────────
+function renderGauge(msi) {
+    const circ = 326.73;
+    document.getElementById('gfill').setAttribute('stroke-dashoffset', (circ*(1-msi)).toFixed(2));
+    document.getElementById('g-num').textContent = msi.toFixed(2);
+    const desc = msi>=.8?'Excellent stability':msi>=.6?'Good stability':msi>=.4?'Moderate stability':'High volatility';
+    document.getElementById('g-desc').textContent = desc;
+}
+
+// ── Progress Chart ───────────────────────────────────────
+function renderProgress(tps) {
+    kill('progress');
+    const pct = +(tps*100).toFixed(1);
+    const col = pct>=0?'#10b981':'#ef4444';
+    charts.progress = new Chart(document.getElementById('progressChart'), {
+        type:'bar',
+        data:{
+            labels:['Progress'],
+            datasets:[{ label:'Therapy Progress %', data:[Math.abs(pct)],
+                        backgroundColor:rgba(col,.22), borderColor:col, borderWidth:2, borderRadius:5 }]
+        },
+        options:{
+            indexAxis:'y', responsive:true, maintainAspectRatio:false,
+            plugins:{ legend:{display:false}, tooltip:{callbacks:{label:ctx=>`${pct>=0?'+':'‑'}${Math.abs(pct)}%`}} },
+            scales:{ x:{min:0,max:100,grid:{color:'rgba(255,255,255,.04)'}}, y:{display:false} }
+        }
+    });
+}
+
+// ── Stressor Pie ─────────────────────────────────────────
+function renderStressor(freq) {
+    kill('stressor');
+    const top = Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,6);
+    if (!top.length) return;
+    charts.stressor = new Chart(document.getElementById('stressorChart'), {
+        type:'pie',
+        data:{
+            labels: top.map(([k])=>humanLabel(k)),
+            datasets:[{ data: top.map(([,v])=>v),
+                        backgroundColor: P.slice(0,top.length).map(c=>rgba(c,.8)),
+                        borderWidth:0 }]
+        },
+        options:{
+            responsive:true, maintainAspectRatio:false,
+            plugins:{ legend:{position:'bottom', labels:{color:'#94a3b8',boxWidth:10,font:{size:10},padding:8}} }
+        }
+    });
+}
+
+// ── Topic Bar ────────────────────────────────────────────
+function renderTopicBar(freq) {
+    kill('topic');
+    const sorted = Object.entries(freq).sort((a,b)=>b[1]-a[1]).slice(0,10);
+    if (!sorted.length) return;
+    charts.topic = new Chart(document.getElementById('topicChart'), {
+        type:'bar',
+        data:{
+            labels: sorted.map(([k])=>humanLabel(k)),
+            datasets:[{
+                label:'Sessions',
+                data: sorted.map(([,v])=>v),
+                backgroundColor: sorted.map((_,i)=>rgba(P[i%P.length],.7)),
+                borderColor: sorted.map((_,i)=>P[i%P.length]),
+                borderWidth:1.5, borderRadius:4
+            }]
+        },
+        options:{
+            responsive:true, maintainAspectRatio:false,
+            plugins:{legend:{display:false}},
+            scales:{ x:{ticks:{maxRotation:45,font:{size:10}},grid:{display:false}}, y:{beginAtZero:true,grid:{color:'rgba(255,255,255,.04)'}} }
+        }
+    });
+}
+
+// ── Heatmap ──────────────────────────────────────────────
+function renderHeatmap(data) {
+    const grid = document.getElementById('heatmap-grid');
+    const recent = data.slice(-49);
+    const padded = [...Array(49-recent.length).fill(null), ...recent];
+    grid.innerHTML = padded.map(d => {
+        if (!d) return `<div class="hm-cell" style="background:rgba(255,255,255,.04);" title="No data"></div>`;
+        const s = d.score||0;
+        const bg = s<.25?rgba('#10b981',.7):s<.55?rgba('#f59e0b',.7):rgba('#ef4444',.7);
+        return `<div class="hm-cell" style="background:${bg};" title="${fmtDate(d.date)}: ${(s*100).toFixed(0)}%"></div>`;
+    }).join('');
+    document.getElementById('hm-count').textContent = `${recent.length} sessions`;
+}
+
+// ── Improvement Trend ────────────────────────────────────
+function renderImprovement(trend) {
+    kill('impr');
+    if (!trend.length) return;
+    charts.impr = new Chart(document.getElementById('improvChart'), {
+        type:'line',
+        data:{
+            labels: trend.map(t=>fmtDate(t.date)),
+            datasets:[{
+                label:'Positive Session %', data: trend.map(t=>+(t.score*100).toFixed(1)),
+                borderColor:'#10b981', backgroundColor:rgba('#10b981',.07),
+                borderWidth:2.5, fill:true, tension:.45, pointRadius:3, pointBackgroundColor:'#10b981'
+            }]
+        },
+        options:{
+            responsive:true, maintainAspectRatio:false,
+            plugins:{legend:{labels:{color:'#94a3b8'}}},
+            scales:{
+                x:{grid:{color:'rgba(255,255,255,.04)'}},
+                y:{min:0,max:100,ticks:{callback:v=>v+'%'},grid:{color:'rgba(255,255,255,.04)'}}
+            }
+        }
+    });
+}
+
+// ── SAFIYA'S TASK: Timeline ──────────────────────────────
+function renderTimeline(sessions) {
+    const list  = document.getElementById('timeline-list');
+    const badge = document.getElementById('session-count-badge');
+    badge.textContent = `${sessions.length} Sessions`;
+
+    if (!sessions.length) {
+        list.innerHTML = `<div style="text-align:center;padding:30px;color:var(--muted);">
+            <i class="fa-regular fa-comment-dots" style="font-size:1.5rem;display:block;margin-bottom:8px;opacity:.4;"></i>
+            No sessions recorded yet. Start your first therapy conversation!
+        </div>`;
+        return;
+    }
+
+    list.innerHTML = sessions.map((s, i) => {
+        const mood  = (s.mood||'neutral').toLowerCase();
+        const date  = new Date(s.date||s.last_message||'');
+        const day   = isNaN(date) ? (i+1) : date.getDate();
+        const month = isNaN(date) ? '' : date.toLocaleString('en-US',{month:'short'});
+
+        let bgColor = '#64748b';
+        let moodClass = 'tag-mood-neutral';
+        if (mood.includes('anx') || mood.includes('dep') || mood.includes('trauma')) {
+            bgColor = '#ef4444'; moodClass = 'tag-mood-anxiety';
+        } else if (mood.includes('stress') || mood.includes('burn')) {
+            bgColor = '#f59e0b'; moodClass = 'tag-mood-stress';
+        } else if (mood.includes('pos') || mood.includes('hap') || mood.includes('good')) {
+            bgColor = '#10b981'; moodClass = 'tag-mood-positive';
+        } else if (mood.includes('depr') || mood.includes('lone')) {
+            bgColor = '#8b5cf6'; moodClass = 'tag-mood-depression';
+        }
+
+        return `
+        <div class="tl-item">
+            <div class="tl-dot" style="background:${bgColor};">
+                <span>${day}<br><small style="font-size:.55rem;font-weight:400;">${month}</small></span>
+            </div>
+            <div class="tl-body">
+                <div class="tl-header">
+                    <span class="tl-title">${s.title||'Therapy Session'}</span>
+                    <span class="tl-date">${isNaN(date)?'—':date.toLocaleDateString()}</span>
+                </div>
+                <p class="tl-summary">${s.summary||s.preview||'Session processed and analysed.'}</p>
+                <div class="tl-tags">
+                    <span class="tl-tag ${moodClass}">${humanLabel(mood)}</span>
+                    <span class="tl-tag">${s.message_count||0} messages</span>
+                    ${(s.themes||[]).slice(0,2).map(t=>`<span class="tl-tag">${humanLabel(t)}</span>`).join('')}
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+// ── IQRA'S TASK: Medical Report ──────────────────────────
+function renderReport(report) {
+    const med    = report.medical_history  || [];
+    const pers   = report.personal_profile || [];
+    const risks  = report.risk_flags       || [];
+
+    // Medical history
+    const medEl = document.getElementById('medical-list');
+    medEl.innerHTML = med.length ?
+        med.map(item => `<div class="report-item">${item}</div>`).join('') :
+        `<div class="report-empty"><i class="fa-solid fa-stethoscope"></i>No medical records detected yet. As you chat, your medical profile builds automatically.</div>`;
+
+    // Personal profile
+    const persEl = document.getElementById('personal-list');
+    persEl.innerHTML = pers.length ?
+        pers.map(item => `<div class="report-item">${item}</div>`).join('') :
+        `<div class="report-empty"><i class="fa-solid fa-user"></i>No personal data yet. Keep chatting — your profile builds automatically.</div>`;
+
+    // Risk flags
+    const riskEl = document.getElementById('risk-list-report');
+    riskEl.innerHTML = risks.length ?
+        risks.map(item => `<div class="report-item risk">${item}</div>`).join('') :
+        `<div class="report-empty"><i class="fa-solid fa-shield-check" style="color:var(--green);"></i>No risk flags detected in session history.</div>`;
+}
+
+// ── AKSHAT'S TASK: Safety Module ─────────────────────────
+function renderSafety(alerts, resources, tips) {
+    // Active alerts
+    const alertsSection = document.getElementById('active-alerts-section');
+    const alertsList    = document.getElementById('active-alerts');
+
+    if (alerts.length) {
+        alertsSection.style.display = 'block';
+        alertsList.innerHTML = alerts.map(a => {
+            const cats = (a.categories||[]).map(humanLabel).join(' · ') || 'Unknown';
+            return `
+            <div class="alert-row">
+                <span class="alert-sev sev-${a.severity||'MODERATE'}">${a.severity||'MOD'}</span>
+                <div class="alert-info">
+                    <div class="alert-cats">${cats}</div>
+                    <div class="alert-ts">${fmtDt(a.timestamp)}</div>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    // Emergency contacts
+    const contactsGrid = document.getElementById('contacts-grid');
+    const iconMap = {
+        'Suicide':'🆘', 'Crisis Text':'💬', 'iCall':'🇮🇳',
+        'Vandrevala':'🇮🇳', 'International':'🌍', 'Emergency':'🚨',
+        'NIMHANS':'🏥', 'Fortis':'💙', 'default':'📞'
+    };
+
+    const defaultContacts = {
+        '🆘 Crisis Lifeline (US)': 'Call or text **988**',
+        '💬 Crisis Text Line': 'Text HOME to **741741**',
+        '🇮🇳 iCall (India)': '**9152987821**',
+        '🇮🇳 Vandrevala Foundation': '**1860-2662-345** (24/7)',
+        '🏥 NIMHANS (India)': '**080-46110007**',
+        '💙 Fortis Helpline': '**8376804102**',
+        '🚨 Emergency (US)': 'Call **911**',
+        '🌍 Emergency (EU/India)': '**112** / **100**',
+    };
+
+    const contacts = Object.keys(resources).length ? resources : defaultContacts;
+
+    contactsGrid.innerHTML = Object.entries(contacts).map(([name, detail]) => {
+        const clean = detail.replace(/\*\*/g,'').replace(/\[.*?\]\(.*?\)/g,'(see link)');
+        const link  = detail.match(/https?:\/\/\S+/);
+        return `
+        <div class="contact-card">
+            <div class="contact-name">${name}</div>
+            <div class="contact-detail">${link ? `<a href="${link[0]}" target="_blank" style="color:inherit;">${clean}</a>` : clean}</div>
+        </div>`;
+    }).join('');
+
+    // Safety tips
+    const tipDefaults = [
+        'Reach out to a trusted friend or family member right now.',
+        'Move to a safe, public space if you feel in danger.',
+        'Remove access to anything that could be used for self-harm.',
+        'Call a crisis line — counsellors are available 24/7.',
+        'Go to the nearest ER if the urge becomes overwhelming.',
+        'Ground yourself: name 5 things you can see, 4 you can touch.',
+    ];
+
+    const tipList = document.getElementById('tips-list');
+    const activeTips = tips.length ? tips : tipDefaults;
+    tipList.innerHTML = activeTips.map(t=>`<div class="tip-item">${t}</div>`).join('');
+}
+
+// ── Safety toggle ────────────────────────────────────────
+function toggleSafety() {
+    safetyOpen = !safetyOpen;
+    document.getElementById('safety-body').style.display = safetyOpen ? 'block' : 'none';
+    document.getElementById('safety-toggle').innerHTML =
+        safetyOpen ? '<i class="fa-solid fa-chevron-up"></i> Hide Resources'
+                   : '<i class="fa-solid fa-chevron-down"></i> Show Resources';
+}
+
+// ── Report tab switch ─────────────────────────────────────
+function switchRTab(id, btn) {
+    document.querySelectorAll('.report-panel').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.rtab').forEach(b=>b.classList.remove('active'));
+    document.getElementById('rpanel-'+id).classList.add('active');
+    btn.classList.add('active');
+}
+
+// ── Init ─────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', loadAll);
+</script>
+</body>
+</html>

@@ -1,100 +1,158 @@
 import json
+from textblob import TextBlob
 from memory.long_term_memory import LongTermMemory
+import nltk
+from collections import Counter
+from datetime import datetime
+# Ensure NLTK data is downloaded (run once if needed)
+# nltk.download('punkt')
+# nltk.download('stopwords')
 
 class UserLifeUnderstanding:
-    def __init__(self, user_id="default"):
+    def __init__(self, user_id="default", memory_store=None):
+        """
+        Initializes the UserLifeUnderstanding with a memory store.
+        """
         self.user_id = user_id
-        self.ltm = LongTermMemory(user_id=user_id)
+        if memory_store:
+            self.memory_store = memory_store
+        else:
+            from api.memory_store import ServerMemoryStore
+            self.memory_store = ServerMemoryStore()
 
-    def connect_past_present(self, current_text):
+    def connect_past_present(self, current_input, n_results=5):
         """
-        Searches for past conversations similar to the current topic.
+        Connects past conversations with the present by retrieving relevant past entries.
+        Args:
+            current_input (str): The current user input (transcript).
+            n_results (int): Number of past results to retrieve.
+        Returns:
+            list: Relevant past conversations.
         """
-        try:
-            # Safe Retrieve
-            results = self.ltm.retrieve(current_text, n_results=3)
-            
-            # GUARD CLAUSE: If results is None, return empty list
-            if not results:
-                return []
+        results = self.memory_store.retrieve_memories(user_id=self.user_id, query=current_input, top_k=n_results)
+        return [r['text'] for r in results]
 
-            # Safe Get: Handle if 'documents' key is missing or None
-            raw_docs = results.get('documents') or []
+    def analyze_recurring_problems(self, n_recent=50):
+        """
+        Analyzes recurring problems and emotional patterns by examining stored memories.
+        Args:
+            n_recent (int): Number of recent entries to analyze.
+        Returns:
+            dict: Analysis of recurring problems and patterns.
+        """
+        # Retrieve recent memories from logs (conversations) or episodic
+        mems = self.memory_store.retrieve_memories(user_id=self.user_id, query="", memory_type="conversation", top_k=n_recent)
+        if not mems:
+             mems = self.memory_store.retrieve_memories(user_id=self.user_id, query="", memory_type="episodic", top_k=n_recent)
+        
+        problems = []
+        emotions = []
+        for mem in mems:
+            doc = mem['text']
+            try:
+                # Try JSON first
+                data = json.loads(doc)
+                transcript = data.get('transcript', doc)
+            except:
+                transcript = doc
             
-            # Flatten list of lists (ChromaDB format)
-            past_connections = []
-            if raw_docs:
-                for sublist in raw_docs:
-                    if sublist:
-                        for doc in sublist:
-                            # Avoid exact duplicate of current input
-                            if doc and doc != current_text:
-                                past_connections.append(doc)
-            
-            return past_connections
-        except Exception as e:
-            print(f"Error in connect_past_present: {e}")
-            return []
+            sentiment = TextBlob(transcript).sentiment.polarity
+            emotions.append(sentiment)
+            # Simple keyword extraction for problems (negative words)
+            if sentiment < 0:
+                words = nltk.word_tokenize(transcript.lower())
+                problems.extend([w for w in words if w not in nltk.corpus.stopwords.words('english') and len(w) > 3])
+        
+        recurring_problems = Counter(problems).most_common(10)
+        emotional_patterns = {
+            'average_sentiment': sum(emotions) / len(emotions) if emotions else 0,
+            'sentiment_variance': sum((x - (sum(emotions)/len(emotions)))**2 for x in emotions) / len(emotions) if emotions else 0
+        }
+        return {
+            'recurring_problems': recurring_problems,
+            'emotional_patterns': emotional_patterns
+        }
 
-    def analyze_recurring_problems(self):
+    def build_life_story(self, n_entries=100):
         """
-        Checks for repeated negative patterns in history.
+        Builds a long-term understanding of the user's life story by summarizing stored memories.
+        Args:
+            n_entries (int): Number of entries to summarize.
+        Returns:
+            str: Summary of the user's life story.
         """
-        try:
-            keywords = "struggle anxiety sad problem hard fail"
-            results = self.ltm.retrieve(keywords, n_results=5)
+        mems = self.memory_store.retrieve_memories(user_id=self.user_id, query="", memory_type="episodic", top_k=n_entries)
+        if not mems:
+            mems = self.memory_store.retrieve_memories(user_id=self.user_id, query="", memory_type="conversation", top_k=n_entries)
             
-            if not results:
-                return []
+        summaries = []
+        for mem in mems:
+            doc = mem['text']
+            try:
+                data = json.loads(doc)
+                transcript = data.get('transcript', doc)
+                summaries.append(transcript)
+            except:
+                summaries.append(doc)
+        
+        if not summaries:
+            return "No life history recorded yet."
 
-            raw_docs = results.get('documents') or []
-            problems = []
+        # Simple concatenation and summarization
+        full_text = ' '.join(summaries)
+        blob = TextBlob(full_text)
+        sentences = blob.sentences
+        # Take first and last few sentences as summary
+        summary = ' '.join([str(s) for s in sentences[:3] + sentences[-3:]])
+        return summary
+
+    def recognize_emotional_progress(self, n_entries=50):
+        """
+        Recognizes emotional progress or setbacks by tracking sentiment over time.
+        Args:
+            n_entries (int): Number of entries to analyze.
+        Returns:
+            dict: Emotional progress analysis.
+        """
+        # Retrieve from conversation logs
+        mems = self.memory_store.retrieve_memories(user_id=self.user_id, query="", memory_type="conversation", top_k=n_entries)
+        if not mems:
+            return {'progress': 'No data'}
             
-            if raw_docs:
-                for sublist in raw_docs:
-                    if sublist:
-                        for doc in sublist:
-                            # Simple heuristic: if it contains negative words
-                            if any(w in doc.lower() for w in ["sad", "anxious", "can't", "failed"]):
-                                problems.append(doc)
-            return problems
-        except Exception as e:
-            print(f"Error in analyze_recurring_problems: {e}")
-            return []
-
-    def build_life_story(self):
-        """
-        Attempts to find facts about the user (names, places).
-        """
-        try:
-            # We look for "My name is" or "I live in" type statements
-            results = self.ltm.retrieve("My name is I live in I am from", n_results=5)
+        sentiments = []
+        for mem in mems:
+            doc = mem['text']
+            # Simple sentiment analysis on the raw text
+            sentiment = TextBlob(doc).sentiment.polarity
+            sentiments.append(sentiment)
             
-            if not results:
-                return {}
-
-            raw_docs = results.get('documents') or []
-            facts = []
+        if not sentiments:
+            return {'progress': 'No data'}
             
-            if raw_docs:
-                for sublist in raw_docs:
-                    if sublist:
-                        facts.extend(sublist)
-            
-            return {"potential_facts": facts}
-        except Exception as e:
-            print(f"Error in build_life_story: {e}")
-            return {}
+        # Compare first half with second half (reverse chronological)
+        # mems are usually reverse chronological
+        recent_half = sentiments[:len(sentiments)//2]
+        older_half = sentiments[len(sentiments)//2:]
+        
+        initial_avg = sum(older_half) / len(older_half) if older_half else 0
+        recent_avg = sum(recent_half) / len(recent_half) if recent_half else 0
+        
+        progress = 'improving' if recent_avg > initial_avg + 0.05 else 'declining' if recent_avg < initial_avg - 0.05 else 'stable'
+        
+        return {
+            'initial_sentiment': initial_avg,
+            'recent_sentiment': recent_avg,
+            'progress': progress
+        }
 
-    def recognize_emotional_progress(self):
+    def maintain_consistency(self, current_input):
         """
-        Compare recent emotions to past emotions.
+        Maintains consistency across sessions by retrieving relevant past context.
+        Args:
+            current_input (str): Current input.
+        Returns:
+            str: Consistent context summary.
         """
-        # This is complex, so we return a placeholder for now to be safe
-        return "Stable"
-
-    def maintain_consistency(self, current_text):
-        """
-        Checks if the user contradicts themselves.
-        """
-        return "Consistent"
+        past = self.connect_past_present(current_input, n_results=3)
+        context = ' '.join(past)
+        return context
