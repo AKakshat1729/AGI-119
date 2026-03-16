@@ -1,0 +1,866 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AGI-119 | AGITherapist</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/style.css?v=4">
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.2/purify.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- INSIGHT SIDEBAR -->
+        <aside class="sidebar" id="sidebar">
+            <!-- Fixed Header -->
+            <div class="sidebar-header">
+                <i class="fa-solid fa-brain" style="color: var(--accent-color)"></i>
+                <span class="brand-title">AGITherapist</span>
+                <button class="action-btn" onclick="toggleSidebar()" style="margin-left: auto; width: 32px; height: 32px; font-size: 0.8rem;">
+                    <i class="fa-solid fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Scrollable Middle Content -->
+            <div class="sidebar-scroll">
+                <button class="sidebar-action" onclick="startNewSession()" style="background: rgba(0, 243, 255, 0.1); border: 1px solid var(--accent-color); color: var(--accent-color); margin-top: 16px;">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>New Session</span>
+                </button>
+
+                <!-- Mood Tracker -->
+                <div class="section-header">Live Status</div>
+                <div class="stat-card">
+                    <div class="stat-label">Reference Tone</div>
+                    <div class="mood-indicator">
+                        <div class="mood-dot" id="mood-dot"></div>
+                        <span id="mood-text" style="font-size: 0.9rem; font-weight: 500;">Stable</span>
+                    </div>
+                </div>
+
+                <button class="sidebar-action" onclick="openDashboard()" style="margin-top: 4px;">
+                    <i class="fa-solid fa-chart-line"></i>
+                    <span>My Progress</span>
+                </button>
+                <a href="/analytics" class="sidebar-action" style="text-decoration:none; display:flex; align-items:center; gap:10px;">
+                    <i class="fa-solid fa-chart-pie" style="color:var(--accent);"></i>
+                    <span>Full Clinical Analytics</span>
+                    <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.65rem; margin-left:auto; opacity:0.5;"></i>
+                </a>
+
+                <!-- Memory Snapshot (loads on page load) -->
+                <div class="section-header">Memory Snapshot</div>
+                <div id="memory-snapshot" style="padding: 10px 12px; font-size: 0.82rem; color: var(--text-secondary); background: rgba(0,243,255,0.03); border-radius: 8px; margin-bottom: 8px; min-height: 40px;">
+                    Loading...
+                </div>
+
+                <!-- History -->
+                <div class="section-header">Memory Archives</div>
+                <div class="history-list" id="history-list">
+                    <!-- Populated via JS -->
+                    <div style="padding: 10px; color: var(--text-secondary); font-size: 0.85rem;">Loading archives...</div>
+                </div>
+            </div>
+
+            <!-- Fixed Footer: User Controls -->
+            <div class="sidebar-footer">
+                <div class="stat-label">User Profile</div>
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                    <div class="avatar" style="width: 32px; height: 32px; background: var(--accent-color); color: #000; font-size: 0.9rem;">
+                        <i class="fa-solid fa-user"></i>
+                    </div>
+                    <div style="font-size: 0.9rem; overflow: hidden; text-overflow: ellipsis;">{{ user_name }}</div>
+                </div>
+                <button class="sidebar-action" onclick="openSettings()">
+                    <i class="fa-solid fa-cog"></i>
+                    <span>System Config</span>
+                </button>
+                <button class="sidebar-action" onclick="location.href='/logout'" style="color: #ef4444;">
+                    <i class="fa-solid fa-power-off"></i>
+                    <span>Disconnect</span>
+                </button>
+            </div>
+        </aside>
+
+        <!-- MAIN CHAT AREA -->
+        <main class="chat-area">
+            <header class="chat-header">
+                <button class="action-btn" onclick="toggleSidebar()">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                
+                <div class="therapist-status">
+                    <div class="orb-container">
+                        <div class="orb" id="orb"></div>
+                    </div>
+                    <div style="text-align: left;">
+                        <div style="font-weight: 600; font-size: 0.95rem;">AGI-119 Core</div>
+                        <div class="status-text" id="status-text">Online & Listening</div>
+                    </div>
+                </div>
+
+                <button class="action-btn" onclick="openSettings()">
+                    <i class="fa-solid fa-sliders"></i>
+                </button>
+            </header>
+
+            <div class="messages-wrapper" id="messages-container">
+                <!-- Welcome Message -->
+                <div class="message-row bot">
+                    <div class="avatar"><i class="fa-solid fa-robot"></i></div>
+                    <div class="message-bubble">
+                        I am AGI-119. I'm here to listen, process, and support you. How are you feeling right now?
+                    </div>
+                </div>
+            </div>
+
+            <!-- INPUT AREA -->
+            <div class="input-area">
+                <div class="input-capsule">
+                    <button class="action-btn" id="mic-btn" onclick="toggleMic()">
+                        <i class="fa-solid fa-microphone"></i>
+                    </button>
+                    <textarea id="user-input" placeholder="Type your thoughts..." rows="1" oninput="autoResize(this)"></textarea>
+                    <button class="action-btn send-btn" onclick="sendMessage()">
+                        <i class="fa-solid fa-paper-plane"></i>
+                    </button>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div class="modal-overlay" id="settings-modal" onclick="closeSettings(event)">
+        <div class="modal" id="settings-content" onclick="event.stopPropagation()">
+            <div class="modal-header">
+                <div class="modal-title">System Configuration</div>
+                <button class="close-modal" onclick="closeSettings()"><i class="fa-solid fa-times"></i></button>
+            </div>
+
+            <!-- Tabs -->
+            <div style="display: flex; gap: 16px; margin-bottom: 24px; border-bottom: 1px solid var(--glass-border);">
+                <button class="tab-btn active" onclick="switchTab('general')">General</button>
+                <button class="tab-btn" onclick="switchTab('api')">API & Model</button>
+                <button class="tab-btn" onclick="switchTab('insights')">Medical Insights</button>
+            </div>
+
+            <!-- General Tab -->
+            <div id="tab-general" class="tab-content">
+                <div class="setting-group">
+                    <label>Interface Theme</label>
+                    <div style="display: flex; gap: 12px; align-items: center;">
+                        <span style="font-size: 0.9rem; color: var(--text-secondary);">Dark Tech Mode</span>
+                        <div style="margin-left: auto;">
+                            <!-- Only dark mode supported for now in this request -->
+                             <span style="color: var(--accent-color); font-size: 0.8rem;">Active</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="setting-group" style="margin-top: 20px;">
+                    <label>Change Password</label>
+                    <input type="password" id="old-password" class="setting-input" placeholder="Current Password" style="margin-bottom: 10px;">
+                    <input type="password" id="new-password" class="setting-input" placeholder="New Password" style="margin-bottom: 10px;">
+                    <button class="save-btn" onclick="changePassword()">Update Password</button>
+                    <div id="password-msg" style="margin-top: 8px; font-size: 0.85rem;"></div>
+                </div>
+            </div>
+
+            <!-- API Tab -->
+            <div id="tab-api" class="tab-content" style="display: none;">
+                <div class="setting-group">
+                    <label>Gemini API Key</label>
+                    <input type="password" id="gemini-key" class="setting-input" placeholder="Enter your Gemini API Key">
+                    <button class="save-btn" onclick="saveApiKey()">Update Key</button>
+                    <div style="margin-top: 8px; font-size: 0.8rem; color: var(--text-secondary);">Key is securely stored in your profile settings.</div>
+                </div>
+            </div>
+
+            <!-- Insights Tab -->
+            <div id="tab-insights" class="tab-content" style="display: none;">
+                <div class="setting-group">
+                    <label>Long-Term Condition Analysis</label>
+                    <div style="height: 250px; width: 100%;">
+                        <canvas id="healthChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- DASHBOARD MODAL -->
+    <div class="modal-overlay" id="dashboard-modal" onclick="closeDashboard(event)">
+        <div class="modal" id="dashboard-content" onclick="event.stopPropagation()" style="max-width: 800px;">
+            <div class="modal-header">
+                <div class="modal-title">Therapeutic Progress Dashboard</div>
+                <button class="close-modal" onclick="closeDashboard()"><i class="fa-solid fa-times"></i></button>
+            </div>
+
+            <div style="display: flex; gap: 16px; margin-bottom: 24px; border-bottom: 1px solid var(--glass-border);">
+                <button class="tab-btn active" onclick="switchDashTab('timeline')">Session Timeline</button>
+                <button class="tab-btn" onclick="switchDashTab('report')">Medical Report</button>
+            </div>
+
+            <div id="dash-timeline" class="dash-tab-content">
+                <div id="timeline-container" style="display: flex; flex-direction: column; gap: 12px; max-height: 400px; overflow-y: auto;">
+                    <div style="text-align: center; color: var(--text-secondary);">Loading timeline...</div>
+                </div>
+            </div>
+
+            <div id="dash-report" class="dash-tab-content" style="display: none;">
+                <div class="setting-group">
+                    <label>Medical Profile & History</label>
+                    <div id="medical-list" style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px; margin-bottom: 12px;"></div>
+                </div>
+                <div class="setting-group">
+                    <label>Personal Considerations</label>
+                    <div id="personal-list" style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            padding: 8px 16px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-weight: 500;
+        }
+        .tab-btn.active {
+            color: var(--accent-color);
+            border-bottom-color: var(--accent-color);
+        }
+        
+        /* Delete Button Styles */
+        .history-item {
+            position: relative;
+            padding-right: 40px !important;
+        }
+        .delete-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+            border: none;
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.2s;
+        }
+        .history-item:hover .delete-btn,
+        .timeline-item:hover .delete-btn {
+            opacity: 1;
+        }
+        .delete-btn:hover {
+            background: #ef4444;
+            color: white;
+        }
+    </style>
+
+    <!-- JS LOGIC -->
+    <script>
+        let isRecording = false;
+        let mediaRecorder;
+        let audioChunks = [];
+        let conversationId = null;
+        let chartInstance = null;
+
+        // --- INIT ---
+        window.addEventListener('load', () => {
+             // Mobile check
+             if (window.innerWidth < 768) {
+                document.getElementById('sidebar').classList.remove('active');
+            } else {
+                // Open by default on desktop for better UX
+                 document.getElementById('sidebar').classList.add('active');
+            }
+            
+            loadSettingsAndTheme();
+            loadHistory();
+        });
+
+        // --- SIDEBAR & NAVIGATION ---
+        function toggleSidebar() {
+            const sidebar = document.getElementById('sidebar');
+            sidebar.classList.toggle('active');
+            
+            // Adjust chat area margin on desktop
+            /*
+            const chatArea = document.querySelector('.chat-area');
+            if (window.innerWidth > 768) {
+                if (sidebar.classList.contains('active')) {
+                    chatArea.style.marginLeft = '320px';
+                } else {
+                    chatArea.style.marginLeft = '0';
+                }
+            }
+            */
+        }
+
+        function startNewSession() {
+            conversationId = null;
+            localStorage.removeItem('lastConversationId');
+            document.getElementById('messages-container').innerHTML = `
+                <div class="message-row bot">
+                    <div class="avatar"><i class="fa-solid fa-robot"></i></div>
+                    <div class="message-bubble">
+                        I am ready for a new session. How can I help you now?
+                    </div>
+                </div>
+            `;
+            setOrbState('listening');
+            if (window.innerWidth < 768) toggleSidebar();
+        }
+
+        async function loadHistory() {
+            const container = document.getElementById('history-list');
+            try {
+                const res = await fetch(`/api/conversation-threads?_=${new Date().getTime()}`);
+                const data = await res.json();
+                
+                if (data.threads && data.threads.length > 0) {
+                    // Update mood from most recent thread if available
+                    const recent = data.threads[0];
+                    if (recent.mood) {
+                         const moodDot = document.getElementById('mood-dot');
+                         const moodText = document.getElementById('mood-text');
+                         moodText.textContent = recent.mood.toUpperCase();
+                         
+                         let color = '#10b981'; // green
+                         if (recent.mood.includes('sad')) color = '#3b82f6';
+                         if (recent.mood.includes('anx')) color = '#f59e0b';
+                         if (recent.mood.includes('ang')) color = '#ef4444';
+                         
+                         moodDot.style.background = color;
+                         moodDot.style.boxShadow = `0 0 15px ${color}`;
+                    }
+
+                    // --- MEMORY SNAPSHOT: Show recent thread titles in sidebar ---
+                    const snapshot = document.getElementById('memory-snapshot');
+                    const recent5 = data.threads.slice(0, 5);
+                    snapshot.innerHTML = recent5.map(t => {
+                        const d = new Date(t.last_message);
+                        const dateStr = isNaN(d) ? '' : d.toLocaleDateString();
+                        return `<div style="padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.05); display:flex; justify-content:space-between;">
+                            <span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:140px;">${t.title || 'Session'}</span>
+                            <span style="color:rgba(255,255,255,0.3);font-size:0.75rem;">${dateStr}</span>
+                        </div>`;
+                    }).join('');
+
+                    container.innerHTML = data.threads.map(t => `
+                        <div class="history-item" onclick="loadConversation('${t.id}')">
+                            <i class="fa-regular fa-comment-dots"></i>
+                            <div style="flex: 1; overflow: hidden;">
+                                <div style="font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${t.title || 'Untitled Session'}</div>
+                                <div style="font-size: 0.75rem; color: var(--text-secondary);">${new Date(t.last_message).toLocaleDateString()}</div>
+                            </div>
+                            <button class="delete-btn" onclick="event.stopPropagation(); confirmDelete('${t.id}', '${(t.title || 'this session').replace(/'/g, "\\'")}')">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    `).join('');
+                } else {
+                    document.getElementById('memory-snapshot').innerHTML = '<span>No sessions yet. Start chatting!</span>';
+                    container.innerHTML = '<div style="padding: 12px; color: var(--text-secondary); font-size: 0.85rem;">No history found.</div>';
+                }
+
+                // Also preload chart, timeline and report in background
+                loadInsightsGraph();
+                loadTimeline();
+                loadReport();
+
+                // Restore last session
+                const lastSessionId = localStorage.getItem('lastConversationId');
+                if (lastSessionId) {
+                    loadConversation(lastSessionId);
+                }
+            } catch (e) {
+                container.innerHTML = '<div style="color: red; padding: 10px;">Error loading history</div>';
+            }
+        }
+
+        async function loadConversation(id) {
+            conversationId = id;
+            localStorage.setItem('lastConversationId', id);
+            const container = document.getElementById('messages-container');
+            container.innerHTML = '<div style="text-align: center; padding: 20px;">Loading memory...</div>';
+            
+            try {
+                const res = await fetch(`/api/conversation/${id}/messages`);
+                const data = await res.json();
+                
+                container.innerHTML = '';
+                if (data.messages) {
+                    data.messages.forEach(msg => {
+                        addMessage(msg.text, msg.role);
+                    });
+                }
+                if (window.innerWidth < 768) toggleSidebar();
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        async function confirmDelete(id, title) {
+            if (confirm(`Are you sure you want to delete "${title}"? This cannot be undone.`)) {
+                try {
+                    const res = await fetch('/api/delete-conversation', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({ conversation_id: id })
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                        if (conversationId === id) startNewSession();
+                        
+                        // Refresh all lists
+                        loadHistory();
+                        if (document.getElementById('dashboard-modal').classList.contains('open')) {
+                            loadTimeline();
+                            loadReport();
+                        }
+                        // Refresh graph if settings open
+                        if (document.getElementById('settings-modal').classList.contains('open')) {
+                            loadInsightsGraph();
+                        }
+                    } else {
+                        alert("Delete failed: " + data.message);
+                    }
+                } catch (e) {
+                    alert("System error during deletion");
+                }
+            }
+        }
+
+        // --- SETTINGS ---
+        function openSettings() {
+            document.getElementById('settings-modal').classList.add('open');
+            loadInsightsGraph();
+        }
+
+        function closeSettings(e) {
+            if (e && e.target.id !== 'settings-modal') return; // Click outside check within onclick="closeSettings(event)"
+            document.getElementById('settings-modal').classList.remove('open');
+        }
+
+        function switchTab(tabId) {
+            document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
+            document.getElementById('tab-' + tabId).style.display = 'block';
+            
+            document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+            event.target.classList.add('active'); // Assumes called from btn
+        }
+
+        async function loadSettingsAndTheme() {
+            try {
+                const res = await fetch('/api/settings');
+                const data = await res.json();
+                if (data.settings) {
+                    // Apply API key if needed for local UI logic (not really needed here, but kept)
+                    if (data.settings.gemini_api_key) {
+                        document.getElementById('gemini-key').value = data.settings.gemini_api_key;
+                    }
+                    
+                    // Apply Theme
+                    if (data.settings.dark_mode) {
+                        document.body.classList.add('dark-mode');
+                        document.getElementById('darkModeToggle').checked = true;
+                    } else {
+                        document.body.classList.remove('dark-mode');
+                    }
+                    
+                    if (data.settings.theme_color) {
+                        document.documentElement.style.setProperty('--accent-color', data.settings.theme_color);
+                    }
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function saveApiKey() {
+            const key = document.getElementById('gemini-key').value.trim();
+            if (!key) return alert('Please enter a key');
+            
+            try {
+                const res = await fetch('/api/settings/gemini-key', {
+                    method: 'PUT',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ api_key: key })
+                });
+                const data = await res.json();
+                if (data.success) alert('Success: Key Updated');
+                else alert('Error: ' + data.message);
+            } catch (e) {
+                alert('Update failed');
+            }
+        }
+
+        async function changePassword() {
+            const oldPassword = document.getElementById('old-password').value;
+            const newPassword = document.getElementById('new-password').value;
+            const msgEl = document.getElementById('password-msg');
+            
+            if (!oldPassword || !newPassword) {
+                msgEl.style.color = '#ef4444';
+                msgEl.textContent = 'Please fill both fields.';
+                return;
+            }
+            
+            try {
+                msgEl.style.color = 'var(--text-secondary)';
+                msgEl.textContent = 'Updating...';
+                
+                const res = await fetch('/change_password', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ old_password: oldPassword, new_password: newPassword })
+                });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    msgEl.style.color = '#10b981';
+                    msgEl.textContent = 'Password changed successfully.';
+                    document.getElementById('old-password').value = '';
+                    document.getElementById('new-password').value = '';
+                } else {
+                    msgEl.style.color = '#ef4444';
+                    msgEl.textContent = data.error || 'Failed to change password.';
+                }
+            } catch (e) {
+                msgEl.style.color = '#ef4444';
+                msgEl.textContent = 'Network error occurred.';
+            }
+        }
+
+        async function loadInsightsGraph() {
+            try {
+                const res = await fetch('/api/analytics/health');
+                const data = await res.json();
+                
+                if (data.success) {
+                    const ctx = document.getElementById('healthChart').getContext('2d');
+                    if (chartInstance) chartInstance.destroy();
+                    
+                    chartInstance = new Chart(ctx, {
+                        type: 'radar',
+                        data: {
+                            labels: data.labels,
+                            datasets: [{
+                                label: 'User Condition Profile',
+                                data: data.data,
+                                backgroundColor: 'rgba(0, 243, 255, 0.2)',
+                                borderColor: '#00f3ff',
+                                pointBackgroundColor: '#fff',
+                                pointBorderColor: '#fff',
+                                pointHoverBackgroundColor: '#fff',
+                                pointHoverBorderColor: '#00f3ff'
+                            }]
+                        },
+                        options: {
+                            scales: {
+                                r: {
+                                    angleLines: { color: 'rgba(255, 255, 255, 0.1)' },
+                                    grid: { color: 'rgba(255, 255, 255, 0.1)' },
+                                    pointLabels: { color: '#94a3b8' },
+                                    ticks: { backdropColor: 'transparent', color: 'transparent' }
+                                }
+                            },
+                            plugins: {
+                                legend: { labels: { color: 'white' } }
+                            },
+                            maintainAspectRatio: false
+                        }
+                    });
+                }
+            } catch (e) { console.error("Graph error", e); }
+        }
+
+        // --- DASHBOARD LOGIC ---
+        function openDashboard() {
+            document.getElementById('dashboard-modal').classList.add('open');
+            loadTimeline();
+            loadReport();
+        }
+
+        function closeDashboard(e) {
+            if (e && e.target.id !== 'dashboard-modal') return;
+            document.getElementById('dashboard-modal').classList.remove('open');
+        }
+
+        function switchDashTab(tabId) {
+            document.querySelectorAll('.dash-tab-content').forEach(el => el.style.display = 'none');
+            document.getElementById('dash-' + tabId).style.display = 'block';
+            
+            // Update active state for buttons (simple toggle for now)
+            const btns = document.querySelectorAll('#dashboard-modal .tab-btn');
+            btns.forEach(b => b.classList.remove('active'));
+            event.target.classList.add('active');
+        }
+
+        async function loadTimeline() {
+            const container = document.getElementById('timeline-container');
+            try {
+                const res = await fetch(`/api/dashboard/timeline?_=${new Date().getTime()}`);
+                const data = await res.json();
+                
+                if (data.success && data.timeline.length > 0) {
+                    container.innerHTML = data.timeline.map(t => `
+                        <div class="timeline-item" style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; display: flex; gap: 12px; align-items: start; position: relative; margin-bottom: 12px;">
+                            <div style="background: var(--accent-color); color: #000; width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: bold; flex-shrink: 0;">
+                                ${new Date(t.date).getDate()}
+                            </div>
+                            <div style="flex: 1;">
+                                <div style="display: flex; justify-content: space-between; padding-right: 30px;">
+                                    <div style="font-weight: 600;">${t.title}</div>
+                                    <div style="font-size: 0.8rem; color: var(--text-secondary);">${new Date(t.date).toLocaleDateString()}</div>
+                                </div>
+                                <div style="font-size: 0.9rem; margin-top: 4px; color: #cbd5e1;">${t.summary || 'Session processed.'}</div>
+                                <div style="margin-top: 8px; display: flex; gap: 8px;">
+                                    <span style="font-size: 0.75rem; background: rgba(0,0,0,0.3); padding: 2px 8px; border-radius: 10px;">${t.message_count} msgs</span>
+                                    <span style="font-size: 0.75rem; background: rgba(16, 185, 129, 0.2); color: #34d399; padding: 2px 8px; border-radius: 10px;">${t.mood || 'Analyzed'}</span>
+                                </div>
+                            </div>
+                            <button class="delete-btn" style="top: 12px; right: 12px;" onclick="event.stopPropagation(); confirmDelete('${t.id}', '${(t.title || 'this session').replace(/'/g, "\\'")}')">
+                                <i class="fa-solid fa-trash-can"></i>
+                            </button>
+                        </div>
+                    `).join('');
+                } else {
+                    container.innerHTML = '<div style="text-align: center; color: var(--text-secondary);">No sessions recorded yet.</div>';
+                }
+            } catch (e) {
+                container.innerHTML = '<div style="color: red;">Failed to load timeline.</div>';
+            }
+        }
+
+        async function loadReport() {
+            try {
+                const res = await fetch('/api/dashboard/report');
+                const data = await res.json();
+                
+                if (data.success && data.report) {
+                    const medList = data.report.medical_history.length ? 
+                        data.report.medical_history.map(i => `<div style="margin-bottom: 4px;">• ${i}</div>`).join('') : 
+                        '<span style="color: var(--text-secondary);">No medical records found.</span>';
+                        
+                    const persList = data.report.personal_profile.length ? 
+                        data.report.personal_profile.map(i => `<div style="margin-bottom: 4px;">• ${i}</div>`).join('') : 
+                        '<span style="color: var(--text-secondary);">No personal details found.</span>';
+                        
+                    document.getElementById('medical-list').innerHTML = medList;
+                    document.getElementById('personal-list').innerHTML = persList;
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        // --- CHAT LOGIC ---
+        function autoResize(el) {
+            el.style.height = 'auto';
+            el.style.height = el.scrollHeight + 'px';
+        }
+
+        async function sendMessage() {
+            const input = document.getElementById('user-input');
+            const text = input.value.trim();
+            if (!text) return;
+
+            addMessage(text, 'user');
+            input.value = '';
+            input.style.height = 'auto';
+            setOrbState('thinking');
+
+            const formData = new FormData();
+            formData.append('text', text);
+            if (conversationId) formData.append('conversation_id', conversationId);
+
+            try {
+                const res = await fetch('/analyze', { method: 'POST', body: formData });
+                const data = await res.json();
+                
+                setOrbState('speaking');
+                
+                if (data.message) {
+                    addMessage(data.message, 'bot');
+                    conversationId = data.conversation_id;
+                    updateDashboard(data.analysis);
+                    loadHistory(); // Refresh sidebar history
+                    setTimeout(() => loadReport(), 800); // Reload the dashboard report with new emotion info
+                } else if (data.error) {
+                    addMessage("System Alert: " + data.error, 'bot');
+                }
+                
+                setTimeout(() => setOrbState('listening'), 2000);
+
+            } catch (e) {
+                console.error(e);
+                addMessage("Connection Failure. Retrying...", 'bot');
+                setOrbState('error');
+            }
+        }
+
+        function addMessage(text, role) {
+            const container = document.getElementById('messages-container');
+            const row = document.createElement('div');
+            row.className = `message-row ${role}`;
+            
+            const avatar = document.createElement('div');
+            avatar.className = 'avatar';
+            avatar.innerHTML = role === 'user' ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-robot"></i>';
+            
+            const bubble = document.createElement('div');
+            bubble.className = 'message-bubble';
+            
+            try {
+                const raw = marked.parse(text);
+                bubble.innerHTML = DOMPurify.sanitize(raw);
+            } catch (e) {
+                bubble.textContent = text;
+            }
+
+            if (role === 'user') {
+                row.appendChild(bubble); 
+                row.appendChild(avatar);
+            } else {
+                row.appendChild(avatar);
+                row.appendChild(bubble);
+            }
+
+            container.appendChild(row);
+            container.scrollTop = container.scrollHeight;
+        }
+
+        function setOrbState(state) {
+            const orb = document.getElementById('orb');
+            const status = document.getElementById('status-text');
+             
+            // Remove lingering animations
+            orb.style.animation = 'none';
+            orb.offsetHeight; /* trigger reflow */
+
+            if (state === 'thinking') {
+                orb.style.animation = 'pulse 0.5s infinite alternate';
+                orb.style.background = 'radial-gradient(circle, #fff, #00f3ff)';
+                status.textContent = 'Processing neural inputs...';
+            } else if (state === 'speaking') {
+                orb.style.animation = 'pulse 0.2s infinite';
+                orb.style.background = 'radial-gradient(circle, #a8c0ff, #3f2b96)';
+                status.textContent = 'Responding...';
+            } else if (state === 'listening') {
+                orb.style.animation = 'float 6s ease-in-out infinite';
+                orb.style.background = 'radial-gradient(circle at 30% 30%, #a8c0ff, #3f2b96)';
+                status.textContent = 'Online & Listening';
+            } else if (state === 'error') {
+                orb.style.background = 'red';
+                status.textContent = 'System Error';
+            }
+        }
+
+        function updateDashboard(analysis) {
+             if (!analysis) return;
+            const moodDot = document.getElementById('mood-dot');
+            const moodText = document.getElementById('mood-text');
+
+            if (analysis.tone && analysis.tone.overall_mood) {
+                const mood = analysis.tone.overall_mood.toLowerCase();
+                moodText.textContent = mood.toUpperCase();
+                
+                let color = '#10b981'; // green
+                if (mood.includes('sad')) color = '#3b82f6'; // blue
+                if (mood.includes('anx')) color = '#f59e0b'; // orange
+                if (mood.includes('ang')) color = '#ef4444'; // red
+                
+                moodDot.style.background = color;
+                moodDot.style.boxShadow = `0 0 15px ${color}`;
+            }
+        }
+
+        // --- AUDIO ---
+        async function toggleMic() {
+            const btn = document.getElementById('mic-btn');
+            if (!isRecording) {
+                try {
+                    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                    mediaRecorder = new MediaRecorder(stream);
+                    audioChunks = [];
+                    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                    mediaRecorder.onstop = () => {
+                        const blob = new Blob(audioChunks, { type: 'audio/wav' });
+                        sendAudio(blob);
+                        stream.getTracks().forEach(t => t.stop());
+                    };
+                    mediaRecorder.start();
+                    isRecording = true;
+                    btn.style.color = '#ef4444';
+                    btn.classList.add('recording-pulse'); // Add css class for pulse
+                    setOrbState('thinking'); 
+                } catch (e) {
+                    console.error(e);
+                    alert("Microphone access denied. Please allow microphone permissions.");
+                }
+            } else {
+                if (mediaRecorder) mediaRecorder.stop();
+                isRecording = false;
+                btn.style.color = 'var(--text-secondary)';
+                btn.classList.remove('recording-pulse');
+            }
+        }
+
+        async function sendAudio(blob) {
+            const formData = new FormData();
+            formData.append('audio', blob, 'rec.wav');
+            if (conversationId) formData.append('conversation_id', conversationId);
+            
+            // Visual feedback before fetch
+            setOrbState('thinking');
+            
+            try {
+                const res = await fetch('/analyze', { method: 'POST', body: formData });
+                const data = await res.json();
+                
+                setOrbState('speaking');
+
+                if (data.transcript) addMessage("🎙️ " + data.transcript, 'user');
+                if (data.message) {
+                    addMessage(data.message, 'bot');
+                    conversationId = data.conversation_id;
+                    updateDashboard(data.analysis);
+                    loadHistory();
+                    setTimeout(() => loadReport(), 800);
+                }
+                
+                setTimeout(() => setOrbState('listening'), 2000);
+            } catch (e) {
+                console.error(e);
+                setOrbState('error');
+            }
+        }
+        
+        document.getElementById('user-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,23 @@
+# Web Framework & API
+flask
+fastapi
+uvicorn
+pydantic
+python-dotenv
+requests
+
+# AGI & LLM Core
+google-generativeai
+google-genai
+textblob
+nltk
+
+# Memory & Reasoning
+chromadb
+sentence-transformers
+pandas
+numpy
+
+# Perception (Speech & Audio)
+assemblyai
+gTTS
