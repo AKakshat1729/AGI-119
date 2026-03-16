@@ -1,40 +1,23 @@
-# --- Core Web & API Framework ---
+# Web Framework & API
 flask
-flask-login
-flask-cors
 fastapi
 uvicorn
 pydantic
-aiohttp
+python-dotenv
 requests
-httpx
-websockets
-Markupsafe>=2.1.3
-Werkzeug>=2.3.7
 
-# --- AI & Large Language Models ---
+# AGI & LLM Core
 google-generativeai
-sentence_transformers
-transformers
-
-# --- Databases & Memory ---
-pymongo
-dnspython            # Required for MongoDB Atlas +srv connections
-chromadb
-
-# --- Audio & Speech Processing ---
-assemblyai
-pyaudio              # Required for AssemblyAI real-time microphone stream
-sounddevice
-librosa
-gtts
-pyttsx3
-
-# --- Data Science & Utilities ---
-numpy
-pandas
-scikit-learn         # Essential for vector calculations/clustering
+google-genai
 textblob
 nltk
-python-dotenv
-watchdog
+
+# Memory & Reasoning
+chromadb
+sentence-transformers
+pandas
+numpy
+
+# Perception (Speech & Audio)
+assemblyai
+gTTS

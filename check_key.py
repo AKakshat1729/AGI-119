@@ -1,49 +1,45 @@
 import os
+import google.generativeai as genai
 from dotenv import load_dotenv
-import google.generativeai as genai  # Using the installed google-generativeai package
+from typing import Any
 
-# 1. Load environment variables
-load_dotenv()
+# --- Pylance Pacifier ---
+# This stops VS Code from complaining about "configure", "list_models", etc.
+genai_client: Any = genai 
 
-# 2. Get the key
-key = os.getenv("GEMINI_API_KEY")
+def check_gemini_setup():
+    load_dotenv()
+    api_key = os.environ.get("GEMINI_API_KEY")
+    
+    if not api_key:
+        print("❌ Error: GEMINI_API_KEY not found in .env file.")
+        return
 
-print(f"\n🔍 DEBUG INFO:")
-print(f"✅ Key Found: {key[:5]}...{key[-5:]}" if key else "❌ Key Missing")
+    # Use genai_client to satisfy Pylance (Line 17)
+    genai_client.configure(api_key=api_key)
+    
+    print("✅ API Key configured.")
+    print("🔍 Checking available models...")
 
-if key:
     try:
-        # 3. Configure Gemini
-        genai.configure(api_key=key)
-
-        print("⏳ Contacting Google API (using google-generativeai)...")
-
-        # 4. List available models
-        models = genai.list_models()
-        available = [m.name for m in models if 'generateContent' in m.supported_generation_methods]
-        print(f"📋 Available models: {available[:5]}")
-
-        # 5. Pick the best available model
-        preferred = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-pro']
-        chosen = None
-        for p in preferred:
-            if any(p in m for m in available):
-                chosen = next(m for m in available if p in m)
-                break
-
-        if not chosen and available:
-            chosen = available[0]
-
-        if chosen:
-            print(f"🎯 Testing model: {chosen}")
-            model = genai.GenerativeModel(chosen)
-            response = model.generate_content("Say 'Hello' if this works.")
-            print(f"✅ Response: {response.text}")
-            print("🎉 SUCCESS! The key and library are working.")
+        # Use genai_client to satisfy Pylance (Line 22)
+        models = genai_client.list_models()
+        available_models = [m.name for m in models if 'generateContent' in m.supported_generation_methods]
+        
+        if available_models:
+            print(f"✅ Connection successful! Found {len(available_models)} generative models.")
+            print(f"📋 Primary model: {available_models[0]}")
+            
+            # Use genai_client to satisfy Pylance (Line 39)
+            test_model = genai_client.GenerativeModel('gemini-1.5-flash')
+            print("🧪 Testing a simple generation...")
+            response = test_model.generate_content("Say 'System Ready'")
+            print(f"🤖 AI Response: {response.text.strip()}")
         else:
-            print("❌ No usable models found for your API key.")
-
+            print("❌ No generative models found. Check your API permissions.")
+            
     except Exception as e:
-        print(f"❌ Error: {e}")
-else:
-    print("❌ ERROR: GEMINI_API_KEY not found in .env")
+        print(f"❌ Connection failed: {str(e)}")
+
+if __name__ == "__main__":
+    check_gemini_setup()

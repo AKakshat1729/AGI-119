@@ -3,7 +3,7 @@ import json
 import sqlite3
 import threading
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional, cast
 import chromadb
 from chromadb.utils import embedding_functions
 
@@ -25,7 +25,9 @@ class PersonalizedMemoryModule:
         # Using the specified local embedding model
         try:
             from chromadb.utils import embedding_functions
-            self.emb_fn = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
+            # Cast to Any to prevent Pylance "Contravariance" errors
+            raw_emb_fn = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
+            self.emb_fn = cast(Any, raw_emb_fn)
         except Exception as e:
             print(f"[MEMORY] Error loading sentence-transformers: {e}. Falling back to default.")
             self.emb_fn = None
@@ -91,13 +93,14 @@ class PersonalizedMemoryModule:
         conn.close()
 
         # 2. Store in Vector Store
-        # We use a combined key to allow targeted updates for specific facts
-        # like 'occupation' or 'current_city' while allowing multiple 'theme' entries
-        key_id = memory_obj.get('key', 'generic').lower().replace(" ", "_")
+        key_id = str(memory_obj.get('key', 'generic')).lower().replace(" ", "_")
         vector_id = f"{user_id}_{key_id}" if memory_obj.get('category') in ['identity', 'medical'] else memory_id
         
+        # Ensure document is always a string and never None
+        doc_content = str(memory_obj.get('value') or "empty_memory")
+
         self.collection.upsert(
-            documents=[memory_obj.get('value')],
+            documents=[doc_content],
             metadatas=[{
                 "user_id": user_id,
                 "category": memory_obj.get('category'),
@@ -118,17 +121,35 @@ class PersonalizedMemoryModule:
             )
             
             memories = []
-            if results and results['documents']:
-                for i in range(len(results['documents'][0])):
+            
+            # --- PYLANCE SAFETY WRAP ---
+            # We capture these in variables so Pylance knows they aren't 'None'
+            docs_field = results.get('documents')
+            ids_field = results.get('ids')
+            metas_field = results.get('metadatas')
+            dists_field = results.get('distances')
+
+            # 1. Check if the main list exists and has content
+            if results and docs_field is not None and len(docs_field) > 0:
+                doc_list = docs_field[0]
+                
+                # 2. Extract others safely
+                id_list = ids_field[0] if ids_field is not None else []
+                meta_list = metas_field[0] if metas_field is not None else []
+                dist_list = dists_field[0] if dists_field is not None else []
+
+                for i in range(len(doc_list)):
                     memories.append({
-                        "id": results['ids'][0][i],
-                        "value": results['documents'][0][i],
-                        "metadata": results['metadatas'][0][i],
-                        "distance": results['distances'][0][i] if 'distances' in results else 0
+                        "id": id_list[i] if i < len(id_list) else f"gen_{i}",
+                        "value": doc_list[i],
+                        "metadata": meta_list[i] if i < len(meta_list) else {},
+                        "distance": dist_list[i] if i < len(dist_list) else 0.0
                     })
-            # Prioritize by importance score if needed (sorting the top_k)
-            memories.sort(key=lambda x: (1 - x['distance']) * x['metadata'].get('importance', 0.5), reverse=True)
+            
+            # Final sort by importance
+            memories.sort(key=lambda x: (1 - float(x.get('distance', 0))) * float(x.get('metadata', {}).get('importance', 0.5)), reverse=True)
             return memories
+
         except Exception as e:
             print(f"Retrieval error: {e}")
             return []
@@ -154,7 +175,7 @@ class PersonalizedMemoryModule:
         rows = cursor.fetchall()
         conn.close()
 
-        report = {
+        report: Dict[str, List] = {
             "important_identity": [],
             "medical_flags": [],
             "life_story_events": [],
@@ -162,7 +183,6 @@ class PersonalizedMemoryModule:
             "recurring_themes": []
         }
 
-        # Map categories to report keys
         mapping = {
             "identity": "important_identity",
             "medical": "medical_flags",
@@ -184,32 +204,25 @@ class PersonalizedMemoryModule:
         
         return report
 
-    def analyze_historical_data(self, user_id: str, conversations: List[Dict], llm_client_func, api_key: str = None):
-        """
-        Process a list of historical conversation objects to extract long-term memory.
-        Each conversation dict should have a 'transcript' or 'messages' key.
-        """
+    def analyze_historical_data(self, user_id: str, conversations: List[Dict], llm_client_func, api_key: Optional[str] = None):
+        """Process historical conversations to extract long-term memory."""
         print(f"[MEMORY] Starting historical analysis for {user_id} across {len(conversations)} sessions...")
         
         for i, convo in enumerate(conversations):
             try:
-                # Reconstruct transcript if it's a list of messages
                 if "messages" in convo:
                     transcript = ""
                     for msg in convo["messages"]:
-                        role = msg.get("role", "user")
-                        text = msg.get("text", msg.get("content", ""))
+                        role = str(msg.get("role", "user"))
+                        text = str(msg.get("text", msg.get("content", "")))
                         transcript += f"{role.capitalize()}: {text}\n"
                 else:
-                    transcript = convo.get("transcript", "")
+                    transcript = str(convo.get("transcript", ""))
 
                 if not transcript or len(transcript) < 50:
                     continue
                 
                 print(f"  -> Analyzing session {i+1}/{len(conversations)}...")
-                # Run extraction synchronously for each session
-                # We use the same prompt as the async one
-                # Trim transcript to avoid huge token payloads
                 transcript_trimmed = transcript[:3000] if len(transcript) > 3000 else transcript
                 prompt = f"""Analyze this SUSTAINED therapy session transcript and extract critical personal information into structured JSON.
 Categories: identity, medical, risk, life_story, theme.
@@ -220,8 +233,9 @@ TRANSCRIPT:
 
 Extract ALL significantly useful information for long-term therapeutic continuity.
 """
-                response = llm_client_func([{"role": "user", "content": prompt}], api_key=api_key)
-                raw_response = response.get('response', '')
+                # Safety wrap api_key to ensure it's a string for the LLM function
+                response = llm_client_func([{"role": "user", "content": prompt}], api_key=str(api_key or ""))
+                raw_response = str(response.get('response', ''))
                 
                 try:
                     if "```json" in raw_response:
@@ -232,7 +246,6 @@ Extract ALL significantly useful information for long-term therapeutic continuit
                     memories = json.loads(json_str)
                     if isinstance(memories, list):
                         for mem in memories:
-                            # Adjust importance score slightly for historical data if needed
                             self.store_memory_object(user_id, mem)
                        
                 except Exception as e:
@@ -243,17 +256,15 @@ Extract ALL significantly useful information for long-term therapeutic continuit
         
         print(f"[MEMORY] Historical analysis completed for {user_id}.")
 
-    def extract_and_save_async(self, user_id: str, transcript: str, llm_client_func, api_key: str = None):
-        """Asynchronously extract and save memories post-session. Resilient to 429/Quota errors."""
+    def extract_and_save_async(self, user_id: str, transcript: str, llm_client_func, api_key: Optional[str] = None):
+        """Asynchronously extract and save memories post-session."""
         def task():
             try:
                 # 1. IMMEDIATE LOCAL PASS (Zero API Cost)
-                # This ensures we don't lose data even if Quota is 0.
                 if MedicalProfileExtractor:
                     try:
                         extractor = MedicalProfileExtractor()
                         local_rep = extractor.build_full_report(user_id, [transcript])
-                        # Store risks detected locally
                         for risk in local_rep.get('risk_flags', []):
                             self.store_memory_object(user_id, {
                                 "category": "risk",
@@ -261,7 +272,6 @@ Extract ALL significantly useful information for long-term therapeutic continuit
                                 "value": risk,
                                 "importance_score": 0.9
                             })
-                        # Store identity facts (profession, name, etc.)
                         id_data = local_rep.get('identity', {})
                         for k, v in id_data.items():
                             if v:
@@ -274,11 +284,10 @@ Extract ALL significantly useful information for long-term therapeutic continuit
                     except Exception as le:
                         print(f"[MEMORY] Local pass failed: {le}")
 
-                # 2. LLM PASS (Subject to Quota) — skip entirely if llm_client_func is None
                 if not llm_client_func:
-                    print("[MEMORY] LLM pass skipped (quota-saver mode). Local extraction only.")
+                    print("[MEMORY] LLM pass skipped. Local extraction only.")
                     return
-                # Trim transcript to avoid huge token payloads
+
                 transcript_trimmed = transcript[:3000] if len(transcript) > 3000 else transcript
                 prompt = f"""Analyze this therapy session transcript and extract critical personal information into structured JSON.
 Categories: identity, medical, risk, life_story, theme.
@@ -289,39 +298,26 @@ TRANSCRIPT:
 
 Extract ONLY significantly new or updated information. Prioritize risk indicators.
 """
-                response = llm_client_func([{"role": "user", "content": prompt}], api_key=api_key)
+                response = llm_client_func([{"role": "user", "content": prompt}], api_key=str(api_key or ""))
                 
-                # Check for error in response (e.g., 429)
                 if not response or 'error' in response or not response.get('response'):
                     err = response.get('error', 'Unknown API Error')
-                    if '429' in str(err) or 'quota' in str(err).lower():
-                        print(f"[MEMORY] Quota Exceeded (429) - Skipping LLM extraction. Local data saved.")
-                        return
                     print(f"[MEMORY] API returned error: {err}")
                     return
 
-                raw_response = response.get('response', '')
+                raw_response = str(response.get('response', ''))
                 try:
-                    # Look for JSON block
                     if "```json" in raw_response:
                         json_str = raw_response.split("```json")[1].split("```")[0].strip()
                     else:
                         json_str = raw_response.strip()
                     
-                    if not json_str.startswith('[') and not json_str.startswith('{'):
-                         raise ValueError("Invalid JSON start")
-
                     memories = json.loads(json_str)
                     if isinstance(memories, list):
                         for mem in memories:
                             self.store_memory_object(user_id, mem)
-                        print(f"[MEMORY] Successfully extracted {len(memories)} memory units for {user_id}")
                 except Exception as e:
-                    # Suppress ugly raw output if it was a 429 html page
-                    if 'generate_content_free_tier' in raw_response:
-                         print("[MEMORY] Quota limit reached (Free Tier).")
-                    else:
-                         print(f"[MEMORY] Failed to parse extraction JSON: {e}")
+                    print(f"[MEMORY] Failed to parse extraction JSON: {e}")
             except Exception as e:
                 print(f"[MEMORY] Extraction task failed: {e}")
 

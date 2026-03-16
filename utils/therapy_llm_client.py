@@ -2,13 +2,11 @@
 Enhanced LLM Client with Clinical Resources Integration
 """
 import os
-import requests
 from flask import session
 from utils.llm_client import generate_chat_response
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Optional, Any
 from clinical_resources import (
-    get_coping_strategies, get_therapeutic_approach,
-    get_condition_info, get_crisis_resources, embed_clinical_context
+    get_coping_strategies, embed_clinical_context
 )
 
 MAX_RETRIES = 2
@@ -19,11 +17,11 @@ class TherapyLLMClient:
     """Enhanced LLM client with clinical resources"""
     
     def __init__(self):
-        self.api_key = None
+        self.api_key: Optional[str] = None
         # Default model - use environment or gemini recommended
-        self.model = os.environ.get('LLM_MODEL', 'gemini-1.5-flash')
+        self.model = str(os.environ.get('LLM_MODEL', 'gemini-1.5-flash'))
         
-    def get_api_key(self, custom_key=None):
+    def get_api_key(self, custom_key: Optional[str] = None) -> Optional[str]:
         """Get API key from various sources (Gemini)"""
         api_key = (
             custom_key or 
@@ -34,9 +32,9 @@ class TherapyLLMClient:
         if not api_key:
             return None
             
-        return api_key.strip().replace('"', '').replace("'", "")
+        return str(api_key).strip().replace('"', '').replace("'", "")
     
-    def build_clinical_prompt(self, user_message: str, message_history: List[Dict]) -> Tuple[str, str]:
+    def build_clinical_prompt(self, user_message: str, message_history: List[Dict[str, Any]]) -> Tuple[str, Optional[str]]:
         """Build enhanced prompt with clinical resources"""
         
         # Detect potential topics
@@ -48,7 +46,7 @@ class TherapyLLMClient:
             "trauma": ["trauma", "flashback", "nightmare", "triggered", "abuse"]
         }
         
-        detected_condition = None
+        detected_condition: Optional[str] = None
         user_msg_lower = user_message.lower()
         
         for condition, phrases in keywords.items():
@@ -77,42 +75,56 @@ class TherapyLLMClient:
         conversation = system_prompt + "\n\nConversation History:\n"
         
         for msg in message_history[-4:]:
-            role = msg.get('role', 'user')
-            content = msg.get('content', '')
+            role = str(msg.get('role', 'user'))
+            content = str(msg.get('content', ''))
             if role == 'user':
                 conversation += f"\nUser: {content}"
-            elif role in ['assistant', 'bot']:
+            elif role in ['assistant', 'bot', 'model']:
                 conversation += f"\nTherapist: {content}"
         
         conversation += f"\n\nUser: {user_message}\nTherapist:"
         
         return conversation, detected_condition
     
-    def call_gemini(self, messages: List[Dict], custom_api_key: str = None) -> Dict:
+    def call_gemini(self, messages: List[Dict[str, str]], custom_api_key: Optional[str] = None) -> Dict[str, Any]:
         """Call Gemini via `generate_chat_response` wrapper"""
         api_key = custom_api_key or self.get_api_key()
         if not api_key:
             return {"error": "No API key configured", "message": "Please configure your Gemini API key in settings"}
 
         try:
-            result = generate_chat_response(messages=messages, model=self.model, api_key=api_key)
+            # Force the inputs to be correctly typed for the lower-level client
+            result = generate_chat_response(
+                messages=messages, 
+                model=self.model, 
+                api_key=str(api_key)
+            )
+            
             if isinstance(result, dict) and result.get('status') == 'error':
-                return {"error": result.get('error', 'LLM error'), "message": result.get('response')}
-            # normalize
-            return {"success": True, "response": result.get('response') if isinstance(result, dict) else str(result), "tokens_used": result.get('tokens_used', 0) if isinstance(result, dict) else 0}
+                return {"error": str(result.get('error', 'LLM error')), "message": str(result.get('response', ''))}
+            
+            # Normalize the response
+            return {
+                "success": True, 
+                "response": str(result.get('response') if isinstance(result, dict) else result), 
+                "tokens_used": int(result.get('tokens_used', 0) if isinstance(result, dict) else 0)
+            }
         except Exception as e:
             return {"error": "LLM call failed", "message": str(e)}
     
-    def generate_therapy_response(self, user_message: str, message_history: List[Dict], 
-                                  custom_api_key: str = None) -> Dict:
+    def generate_therapy_response(self, user_message: str, message_history: Optional[List[Dict[str, Any]]] = None, 
+                                  custom_api_key: Optional[str] = None) -> Dict[str, Any]:
         """Generate therapy response with clinical context"""
         
+        history = list(message_history or [])
+        user_message = str(user_message or "")
+
         try:
             # Build clinical prompt
-            prompt, detected_condition = self.build_clinical_prompt(user_message, message_history)
+            _, detected_condition = self.build_clinical_prompt(user_message, history)
             
-            # Prepare messages for API
-            messages = [
+            # Prepare messages for API with explicit string typing to please Pylance
+            messages: List[Dict[str, str]] = [
                 {
                     "role": "system",
                     "content": (
@@ -123,12 +135,13 @@ class TherapyLLMClient:
                 }
             ]
             
-            # Add history
-            for msg in message_history[-6:]:
-                if msg.get('role') in ['user', 'assistant']:
+            # Add history safely
+            for msg in history[-6:]:
+                role_val = msg.get('role')
+                if role_val in ['user', 'assistant', 'model']:
                     messages.append({
-                        "role": msg.get('role'),
-                        "content": msg.get('content', '')
+                        "role": str(role_val),
+                        "content": str(msg.get('content', ''))
                     })
             
             # Add current message
@@ -144,7 +157,7 @@ class TherapyLLMClient:
                 return result
             
             # Enhance response if clinical condition detected
-            response_text = result.get('response', '')
+            response_text = str(result.get('response', ''))
             
             if detected_condition:
                 response_text += f"\n\n*Note: Based on what you shared, here are some evidence-based approaches related to {detected_condition}:*"
@@ -169,34 +182,28 @@ class TherapyLLMClient:
             }
 
 
-def get_llm_response(user_message: str, message_history: List[Dict] = None, 
-                     custom_api_key: str = None) -> Dict:
+def get_llm_response(user_message: str, message_history: Optional[List[Dict[str, Any]]] = None, 
+                     custom_api_key: Optional[str] = None) -> Dict[str, Any]:
     """Main function to get LLM response with clinical integration"""
-    
-    if message_history is None:
-        message_history = []
     
     client = TherapyLLMClient()
     return client.generate_therapy_response(user_message, message_history, custom_api_key)
 
 
-def validate_api_key(api_key: str) -> Dict:
+def validate_api_key(api_key: str) -> Dict[str, Any]:
     """Validate API key by making a test request"""
     try:
-        test_messages = [
-            {
-                "role": "system",
-                "content": "You are a helpful assistant."
-            },
-            {
-                "role": "user",
-                "content": "Say 'Hello' if you receive this message."
-            }
+        api_key_str = str(api_key or "").strip()
+        test_messages: List[Dict[str, str]] = [
+            {"role": "user", "content": "Say 'API working'"}
         ]
         
-        # Validate by calling generate_chat_response with a tiny prompt
         try:
-            resp = generate_chat_response(test_messages, model=os.environ.get('LLM_MODEL', 'gemini-1.5-flash'), api_key=api_key)
+            resp = generate_chat_response(
+                messages=test_messages, 
+                model=str(os.environ.get('LLM_MODEL', 'gemini-1.5-flash')), 
+                api_key=api_key_str
+            )
             if isinstance(resp, dict) and resp.get('status') == 'error':
                 return {"valid": False, "message": str(resp.get('error') or resp.get('response')), "error": "INVALID_KEY"}
             return {"valid": True, "message": "API key is valid!", "error": None}

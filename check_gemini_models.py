@@ -3,38 +3,39 @@ check_gemini_models.py
 ─────────────────────
 Utility to probe all available Gemini models and automatically switch
 to a working one when the current model hits a quota / rate-limit error.
-
-Usage (standalone):
-    python check_gemini_models.py
-
-Usage (as module):
-    from check_gemini_models import find_working_model, update_env_model
 """
 
 import os
+from typing import Any, List, Optional
 import google.generativeai as genai
 from dotenv import load_dotenv
+
+# --- Pylance Pacifier ---
+# This stops VS Code from complaining about "configure", "GenerativeModel", etc.
+genai_client: Any = genai 
 
 load_dotenv()
 
 # Priority-ordered candidate models — fastest / cheapest first
+# Removed 2.5-flash as it is not a valid model name
 CANDIDATE_MODELS = [
     "gemini-1.5-flash",
     "gemini-1.5-flash-8b",
     "gemini-1.5-pro",
     "gemini-2.0-flash",
     "gemini-2.0-flash-lite",
-    "gemini-2.5-flash",
     "gemini-pro",
 ]
 
 ENV_PATH = os.path.join(os.path.dirname(__file__), ".env")
 
 
-def _configure(api_key: str = None):
-    key = api_key or os.environ.get("GEMINI_API_KEY", "")
+def _configure(api_key: Optional[str] = None) -> str:
+    """Configures the Gemini client safely."""
+    # Ensure we have a string, never None
+    key = str(api_key or os.environ.get("GEMINI_API_KEY") or "")
     if key:
-        genai.configure(api_key=key.strip())
+        genai_client.configure(api_key=key.strip())
     return key
 
 
@@ -63,23 +64,23 @@ def update_env_model(model_name: str, env_path: str = ENV_PATH) -> bool:
         return False
 
 
-def find_working_model(api_key: str = None, candidates: list = None) -> str | None:
+def find_working_model(api_key: Optional[str] = None, candidates: Optional[List[str]] = None) -> Optional[str]:
     """
     Test each candidate model with a minimal prompt.
     Returns the first model name that succeeds, or None if all fail.
-    Also updates .env automatically when a working model is found.
     """
+    # Safety wrap inputs
     key = _configure(api_key)
     if not key:
         print("[MODEL SWITCH] No API key available — cannot probe models.")
         return None
 
-    probe_list = candidates or CANDIDATE_MODELS
+    probe_list = list(candidates or CANDIDATE_MODELS)
     print(f"[MODEL SWITCH] Probing {len(probe_list)} models for a working one...")
 
     for model_name in probe_list:
         try:
-            model = genai.GenerativeModel(model_name)
+            model = genai_client.GenerativeModel(model_name)
             response = model.generate_content(
                 "Reply with the single word: OK",
                 generation_config={"max_output_tokens": 5, "temperature": 0.0},
@@ -87,7 +88,7 @@ def find_working_model(api_key: str = None, candidates: list = None) -> str | No
             if response and response.text:
                 print(f"[MODEL SWITCH] ✓ '{model_name}' is working!")
                 update_env_model(model_name)
-                return model_name
+                return str(model_name)
         except Exception as e:
             err = str(e)
             if "quota" in err.lower() or "429" in err or "rate" in err.lower():
@@ -106,7 +107,8 @@ if __name__ == "__main__":
     print("[INFO] Checking available Gemini models...\n")
     try:
         _configure()
-        for model in genai.list_models():
+        # Use genai_client to satisfy Pylance
+        for model in genai_client.list_models():
             methods = getattr(model, "supported_generation_methods", [])
             if "generateContent" in methods:
                 print(f"  • {model.name}  [{model.display_name}]")

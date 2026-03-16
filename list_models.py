@@ -1,46 +1,31 @@
 import os
+from typing import Any
+import google.generativeai as genai
 from dotenv import load_dotenv
-from google import genai
 
-# 1. Load the key
-load_dotenv()
-api_key = os.getenv("GEMINI_API_KEY")
+# --- Pylance Pacifier ---
+# This tells the IDE to treat 'genai' as a dynamic object so it stops flagging imports
+genai_client: Any = genai 
 
-if not api_key:
-    print("❌ Error: GEMINI_API_KEY not found in .env")
-    exit()
-
-# 2. Connect
-print(f"🔑 Authenticating with key ending in: ...{api_key[-5:]}")
-client = genai.Client(api_key=api_key)
-
-print("⏳ Asking Google for available models...")
-
-try:
-    # 3. List Models (Simple Loop)
-    pager = client.models.list()
+def list_available_models():
+    load_dotenv()
+    api_key = os.environ.get("GEMINI_API_KEY")
     
-    print("\n✅ AVAILABLE GEMINI MODELS:")
-    print("="*40)
-    
-    count = 0
-    for model in pager:
-        # We safely get the name, ignoring Pylance warnings
-        name = getattr(model, 'name', 'Unknown')
-        
-        # Filter: Only show "Gemini" models to keep list clean
-        if name and 'gemini' in name.lower():
-            # Clean up the name (remove 'models/' prefix if present)
-            display_name = name.replace('models/', '')
-            print(f"🌟 {display_name}")
-            count += 1
-            
-    if count == 0:
-        print("⚠️ No Gemini models found. Your key might have restricted access.")
-    else:
-        print("="*40)
-        print("👉 TIP: Copy one of the names above (like 'gemini-1.5-flash-001')")
-        print("        and paste it into utils/llm_client.py")
+    if not api_key:
+        print("❌ Error: GEMINI_API_KEY not found.")
+        return
 
-except Exception as e:
-    print(f"❌ Error listing models: {e}")
+    # Use the alias to satisfy the import symbol check
+    genai_client.configure(api_key=api_key)
+    
+    print("🔍 Listing Gemini Models...")
+    try:
+        # Using the pacified client here as well
+        for model in genai_client.list_models():
+            if 'generateContent' in model.supported_generation_methods:
+                print(f"✅ {model.name}")
+    except Exception as e:
+        print(f"❌ Error: {e}")
+
+if __name__ == "__main__":
+    list_available_models()

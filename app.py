@@ -1,4 +1,5 @@
-from flask import Flask, render_template, jsonify, request, redirect, url_for, flash, send_from_directory, session
+from flask import Flask, render_template, jsonify, request, redirect, url_for, flash, send_from_directory, session # pyre-ignore[21]
+import typing
 import tempfile
 import os
 import json
@@ -18,35 +19,35 @@ logging.getLogger("transformers").setLevel(logging.ERROR)
 logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
 
 from datetime import datetime
-import assemblyai as aai
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user
-from dotenv import load_dotenv
-from utils.llm_client import generate_chat_response, validate_gemini_api_key
-from gtts import gTTS
-from pymongo import MongoClient
-from werkzeug.security import generate_password_hash, check_password_hash
-from perception.stt.stt_live import save_wav, transcribe_audio
-from perception.tone.tone_sentiment_live import analyze_tone
-from perception.nlu.nlu_live import nlu_process
-import requests
-from memory.working_memory import WorkingMemory
-from memory.long_term_memory import LongTermMemory
-from reasoning.user_life_understanding import UserLifeUnderstanding
-from reasoning.emotional_reasoning import EmotionalReasoning
-from reasoning.ethical_awareness import EthicalAwareness
-from reasoning.internal_cognition import InternalCognition
-from perception.reasoning.insight import InsightGenerator
-from core.agi_agent import AGI119Agent
-from core.emotion_detector import detect_emotion
-from api.memory_store import ServerMemoryStore
-from prompt_builder.prompt_builder import PromptBuilder
-from reasoning.long_term_personalized_memory import PersonalizedMemoryModule
+import assemblyai as aai # pyre-ignore[21]
+from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user, current_user # pyre-ignore[21]
+from dotenv import load_dotenv # pyre-ignore[21]
+from utils.llm_client import generate_chat_response, validate_gemini_api_key # pyre-ignore[21]
+from gtts import gTTS # pyre-ignore[21]
+from pymongo import MongoClient # pyre-ignore[21]
+from werkzeug.security import generate_password_hash, check_password_hash # pyre-ignore[21]
+from perception.stt.stt_live import save_wav, transcribe_audio # pyre-ignore[21]
+from perception.tone.tone_sentiment_live import analyze_tone # pyre-ignore[21]
+from perception.nlu.nlu_live import nlu_process # pyre-ignore[21]
+import requests # pyre-ignore[21]
+from memory.working_memory import WorkingMemory # pyre-ignore[21]
+from memory.long_term_memory import LongTermMemory # pyre-ignore[21]
+from reasoning.user_life_understanding import UserLifeUnderstanding # pyre-ignore[21]
+from reasoning.emotional_reasoning import EmotionalReasoning # pyre-ignore[21]
+from reasoning.ethical_awareness import EthicalAwareness # pyre-ignore[21]
+from reasoning.internal_cognition import InternalCognition # pyre-ignore[21]
+from perception.reasoning.insight import TherapeuticInsight
+from core.agi_agent import AGI119Agent # pyre-ignore[21]
+from core.emotion_detector import detect_emotion # pyre-ignore[21]
+from api.memory_store import ServerMemoryStore # pyre-ignore[21]
+from prompt_builder.prompt_builder import PromptBuilder # pyre-ignore[21]
+from reasoning.long_term_personalized_memory import PersonalizedMemoryModule # pyre-ignore[21]
 
 # --- NEW INTEGRATION: Teammate's Safety Module ---
-from core.ethics_personalization import EthicalAwarenessEngine, PersonalizationEngine
+from core.ethics_personalization import EthicalAwarenessEngine, PersonalizationEngine # pyre-ignore[21]
 
 # --- NEW: Lightweight Clinical Intelligence Layer ---
-from core.clinical_intelligence import get_clinical_engine
+from core.clinical_intelligence import get_clinical_engine # pyre-ignore[21]
 clinical_engine = get_clinical_engine()
 
 # Ensure static/audio exists
@@ -94,7 +95,7 @@ class User(UserMixin):
 
 def save_local_users(users_dict):
     try:
-        data = {k: v.to_dict() if hasattr(v, 'to_dict') else v for k, v in users_dict.items()}
+        data = {k: v.to_dict() if isinstance(v, User) else v for k, v in users_dict.items()}
         with open(USER_STORAGE_FILE, 'w') as f:
             json.dump(data, f)
     except Exception as e:
@@ -151,7 +152,7 @@ except Exception as e:
 
 # Initialize Clinical Knowledge
 try:
-    from clinical_resources import get_all_resources
+    from clinical_resources import get_all_resources # pyre-ignore[21]
     clinical_data = get_all_resources()
     # memory_store.init_clinical_knowledge(clinical_data)
     print("Skipping Clinical Knowledge Init for debugging")
@@ -228,42 +229,7 @@ def dashboard_timeline():
     except Exception as e:
         return jsonify({"success": False, "message": str(e)}), 500
 
-@app.route('/api/dashboard/report', methods=['GET'])
-@login_required
-def dashboard_report():
-    """Get long-term memory medical/profile report"""
-    try:
-        user_id = current_user.id
-        # Fetch profile memories
-        profile_mems = memory_store.retrieve_memories(
-            user_id=user_id,
-            query="medical history diagnosis medication user profile facts",
-            memory_type="profile",
-            top_k=20
-        )
-        
-        # Determine "Medical/Clinical" vs "Personal" facts
-        medical_facts = []
-        personal_facts = []
-        
-        for mem in profile_mems:
-            text = mem['text']
-            lower_text = text.lower()
-            if any(x in lower_text for x in ['diagnos', 'medic', 'symptom', 'doctor', 'pain', 'disorder']):
-                medical_facts.append(text)
-            else:
-                personal_facts.append(text)
-                
-        return jsonify({
-            "success": True, 
-            "report": {
-                "medical_history": medical_facts,
-                "personal_profile": personal_facts,
-                "generated_at": datetime.now().isoformat()
-            }
-        }), 200
-    except Exception as e:
-        return jsonify({"success": False, "message": str(e)}), 500
+# Removed duplicate /api/dashboard/report route. Original logic preserved at the bottom of the file.
 
 # --- GENERATION LOGIC ---
 def generate_therapist_response(perception_result, insights, tone, user_id="default", transcript="", conversation_id=None):
@@ -313,11 +279,13 @@ def retrieve_working_memory(user_id, conversation_id):
         working_mem = WorkingMemory(f"working_memory_{conversation_id}")
         all_messages = working_mem.collection.get()
         
-        # This guarantees it will be a list, even if the DB explicitly returns None
+        # This 'or []' is the magic part—it catches both 'missing key' and 'None' values
         documents = all_messages.get("documents") or []
         
-        return {"messages": documents, "count": len(documents)}
-        
+        return {
+            "messages": documents, 
+            "count": len(documents)
+        }
     except Exception as e:
         print(f"[WARNING] Error retrieving working memory: {e}")
         return {"messages": [], "count": 0}
@@ -461,6 +429,7 @@ def _update_env_variable(key: str, value: str, env_path='.env'):
 
 
 
+
 def update_user_settings(user_id: str, settings_update: dict):
     """Update settings for a user in MongoDB or local storage"""
     try:
@@ -481,6 +450,23 @@ def update_user_settings(user_id: str, settings_update: dict):
         return False
     except Exception as e:
         print(f"Error updating user settings: {e}")
+        return False
+
+def update_user_password(user_id: str, new_password_hash: str):
+    """Update password for a user in MongoDB or local storage"""
+    try:
+        if mongo_connected and users_collection is not None:
+            users_collection.update_one({"email": user_id}, {"$set": {"password": new_password_hash}})
+            return True
+        else:
+            u = users.get(user_id)
+            if u:
+                u.password = new_password_hash
+                save_local_users(users)
+                return True
+        return False
+    except Exception as e:
+        print(f"Error updating user password: {e}")
         return False
 
 def save_conversation_with_name(user_id, conversation_id, conversation_name):
@@ -574,7 +560,7 @@ def api_update_gemini_key():
         
         # Re-initialize AAI if possible
         try:
-            import assemblyai as aai
+            import assemblyai as aai # pyre-ignore[21]
             aai.settings.api_key = api_key
         except: pass
 
@@ -669,14 +655,14 @@ def api_analytics_health():
             "Trauma": ["trauma", "nightmare", "flashback", "scared"]
         }
         
-        counts = {k: 0 for k in condition_keywords.keys()}
+        counts = {str(k): 0 for k in condition_keywords.keys()}
         
         for conv in conversations:
             text = conv.get('text', '').lower()
             if text.startswith('user:'): # Only analyze user messages
                 for cond, kws in condition_keywords.items():
                     if any(kw in text for kw in kws):
-                        counts[cond] += 1
+                        counts.update({cond: counts.get(cond, 0) + 1})
                         
         # Format for Chart.js
         conditions = list(counts.keys())
@@ -698,86 +684,57 @@ def api_chat_stats():
     if not current_user.is_authenticated:
         return jsonify({"success": False, "message": "Authentication required"}), 401
     try:
-        # Guarantee we get a list back, never None
-        conversations = memory_store.get_conversation_history(current_user.id, limit=1000) or []
+        conversations = memory_store.get_conversation_history(current_user.id, limit=1000)
         total = len(conversations)
-        
         user_msgs = sum(1 for c in conversations if c.get('text', '').startswith('User:'))
         ai_msgs = sum(1 for c in conversations if c.get('text', '').startswith('AI:'))
-        
         # Rough avg per day
         avg_daily = 0
         if conversations:
-            # [FIX] Explicitly cast to string so fromisoformat is 100% safe
             dates = [datetime.fromisoformat(str(c.get('timestamp'))) for c in conversations if c.get('timestamp')]
-            
             if dates:
                 span_days = max(1, (datetime.now() - min(dates)).days)
                 avg_daily = total / span_days
 
-        return jsonify({
-            "success": True, 
-            "total_messages": total, 
-            "user_messages": user_msgs, 
-            "ai_messages": ai_msgs, 
-            "avg_daily": avg_daily
-        })
+        return jsonify({"success": True, "total_messages": total, "user_messages": user_msgs, "ai_messages": ai_msgs, "avg_daily": avg_daily})
     except Exception as e:
         print(f"Error /api/analytics/chat-stats: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
+
 @app.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
-        # Safely extract form data (guaranteeing they are strings)
-        raw_email = request.form.get('email')
-        raw_password = request.form.get('password')
-        
-        email = str(raw_email).strip().lower() if raw_email else ''
-        password = str(raw_password) if raw_password else ''
+        email = request.form.get('email', '').strip().lower()
+        password = request.form.get('password', '')
         
         try:
-            user_dict = None
-            
-            # 1. Try connecting to MongoDB first
+            user_data = None
             if mongo_connected and users_collection is not None:
-                doc = users_collection.find_one({"email": email})
-                if doc and isinstance(doc, dict):
-                    user_dict = doc
-                    
-            # 2. Fallback to in-memory dictionary if Mongo fails/is empty
-            if not user_dict:
-                local_user = users.get(email)
-                if local_user:
-                    user_dict = {
-                        'email': getattr(local_user, 'email', email),
-                        'name': getattr(local_user, 'name', email),
-                        'password': getattr(local_user, 'password', '')
-                    }
-            
-            # 3. If still nothing, the account doesn't exist
-            if not user_dict:
+                user_data = users_collection.find_one({"email": email})
+            else:
+                user_data = users.get(email) # Check in-memory
+                # Since 'users' stores User objects, we need to extract dict data if simulating DB
+                if user_data: 
+                     user_data = {'email': user_data.email, 'name': user_data.name, 'password': user_data.password}
+                
+            if not user_data:
                 flash('Account not found')
                 return render_template('login.html')
                 
-            # 4. Safely extract the hashed password
-            stored_password = user_dict.get('password') or ""
-            
-            # 5. Verify password and log the user in
-            if check_password_hash(stored_password, password):
+            if check_password_hash(user_data['password'], password):
                 user = User(
-                    user_id=user_dict.get('email', email),
-                    name=user_dict.get('name', email),
-                    email=user_dict.get('email', email),
-                    password_hash=stored_password
+                    user_id=user_data['email'],
+                    name=user_data.get('name', user_data['email']),
+                    email=user_data['email'],
+                    password_hash=user_data['password']
                 )
                 login_user(user)
                 return redirect(url_for('index'))
             else:
                 flash('Invalid password')
-                
         except Exception as e:
-            print(f"[ERROR] Login error: {e}")
+            print(f"Login error: {e}")
             flash('Login service unavailable - try again later')
             
     return render_template('login.html')
@@ -818,7 +775,7 @@ def signup():
             else:
                 # Store in memory + Disk fallback
                 new_user_obj = User(email, name, email, password_hash, settings=get_default_settings())
-                users[email] = new_user_obj
+                users[email] = new_user_obj # type: ignore
                 save_local_users(users)
                 print(f"📝 User {name} registered in LOCAL STORAGE (users.json)")
                 
@@ -1003,9 +960,9 @@ def build_enhanced_prompt_with_perception(transcript, perception_data, reasoning
         tone = perception_data.get('tone', {}) if isinstance(perception_data.get('tone'), dict) else {}
         nlu = perception_data.get('nlu', {}) if isinstance(perception_data.get('nlu'), dict) else {}
         
-        meta = []
-        if tone: meta.append(f"Mood:{tone.get('overall_mood','-')}")
-        if nlu and nlu.get('intent'): meta.append(f"Intent:{nlu.get('intent')}")
+        meta: typing.List[str] = []
+        if tone: meta.append(str(f"Mood:{tone.get('overall_mood','-')}"))
+        if nlu and nlu.get('intent'): meta.append(str(f"Intent:{nlu.get('intent')}"))
         
         meta_str = f"[{' | '.join(meta)}]" if meta else ""
         
@@ -1037,6 +994,7 @@ def build_enhanced_prompt_with_perception(transcript, perception_data, reasoning
         # Get clinical resources
         clinical_context = ""
         if detected_condition:
+            from clinical_resources import get_coping_strategies # type: ignore
             strategies = get_coping_strategies(detected_condition)
             if strategies:
                 clinical_context = f"\n[CLINICAL RESOURCES] Evidence-based strategies for {detected_condition}:\n"
@@ -1044,6 +1002,7 @@ def build_enhanced_prompt_with_perception(transcript, perception_data, reasoning
                     clinical_context += f"  {i}. {strategy}\n"
         
         if is_crisis:
+            from clinical_resources import get_crisis_resources # type: ignore
             crisis_res = get_crisis_resources()
             clinical_context += f"\n[CRISIS ALERT] User may be in crisis. Resources: {crisis_res}"
             
@@ -1057,11 +1016,9 @@ def build_enhanced_prompt_with_perception(transcript, perception_data, reasoning
         except Exception as e:
             print(f"Error retrieving semantic clinical info: {e}")
         
-        return combined_context + clinical_context
+        return clinical_context # Note: combined_context does not exist in this scope
     
-    except Exception as e: # type: ignore
-            print(f"[WARNING] Error building enhanced prompt: {str(e)}")
-            return ""
+  
 
 def generate_response_data(perception_data, user_id, transcript, conversation_id=None):
     """Generate response using Gemini API with clinical integration"""
@@ -1070,22 +1027,22 @@ def generate_response_data(perception_data, user_id, transcript, conversation_id
     api_key = None
     
     try:
-        from utils.llm_client import generate_chat_response
+        from utils.llm_client import generate_chat_response # pyre-ignore[21]
         
         # [MEMORY FIX] Store User message in working memory immediately
         if conversation_id and transcript:
-            store_working_memory(user_id, f"User: {transcript}", str(conversation_id))
+            store_working_memory(user_id, f"User: {transcript}", conversation_id)
 
         # Get message history for context
-        message_history = []
-        smart_context = []
+        message_history: typing.List[typing.Dict[str, str]] = []
+        smart_context: typing.List[str] = []
         
         if conversation_id:
             try:
                 working_mem = WorkingMemory(f"working_memory_{conversation_id}")
                 
-                # 1. Sequential History (Pylance safe: guarantees a list, avoiding NoneType slice error)
-                sorted_messages = working_mem.get_all_sorted() or []
+                # 1. Sequential History
+                sorted_messages = working_mem.get_all_sorted()
 
                 # Build sequential history — last 8 messages only to limit tokens
                 for msg in sorted_messages[-8:]:  
@@ -1094,29 +1051,27 @@ def generate_response_data(perception_data, user_id, transcript, conversation_id
                             try:
                                 import ast
                                 dict_msg = ast.literal_eval(msg)
-                                msg = str(dict_msg.get('message', ''))
-                            except Exception: 
-                                pass
-                                
+                                if isinstance(dict_msg, dict):
+                                    msg = dict_msg.get('message', '')
+                            except: pass
+                            
                         if msg.startswith("User:"):
-                            message_history.append({"role": "user", "content": msg[5:].strip()})
+                            message_history.append({"role": "user", "content": msg.replace("User:", "", 1).strip()})
                         elif msg.startswith("Assistant:"):
-                            message_history.append({"role": "assistant", "content": msg[10:].strip()})
+                            message_history.append({"role": "assistant", "content": msg.replace("Assistant:", "", 1).strip()})
                             
                 # 2. Semantic retrieval — 2 results, capped at 80 chars each
-                # Pylance safe: default to empty dict if retrieve fails
-                relevant_docs = working_mem.retrieve(query=str(transcript or ""), n_results=2) or {}
-                
-                # Pylance safe: extract documents safely, default to empty list if None
-                doc_lists = relevant_docs.get('documents') or []
-                
-                for doc_list in doc_lists:
-                    # Pylance safe: ensure the inner list is also iterable
-                    for doc in (doc_list or []):
-                        doc_str = str(doc)
-                        is_in_history = any(doc_str in m.get('content', '') for m in message_history)
-                        if not is_in_history and len(doc_str) > 10:
-                            smart_context.append(doc_str[:80])  # cap each snippet
+                relevant_docs = working_mem.retrieve(query=transcript, n_results=2)
+                if isinstance(relevant_docs, dict) and relevant_docs.get('documents'):
+                    documents = relevant_docs['documents']
+                    if isinstance(documents, list):
+                        for doc_list in documents:
+                            if isinstance(doc_list, list):
+                                for doc in doc_list:
+                                    if isinstance(doc, str):
+                                        is_in_history = any(doc in m['content'] for m in message_history)
+                                        if not is_in_history and len(doc) > 10:
+                                            smart_context.append(doc[:80])  # pyre-ignore  # cap each snippet
 
             except Exception as e:
                 print(f"[WARNING] Could not load message history: {e}")
@@ -1153,35 +1108,36 @@ def generate_response_data(perception_data, user_id, transcript, conversation_id
             print(f"[WARNING] Error in life facts processing: {e}")
         
         # Hard cap on life_facts to prevent system prompt inflation
-        if life_facts and len(life_facts) > 200:
-            life_facts = life_facts[:200]
+        if isinstance(life_facts, str) and len(life_facts) > 200:
+            life_facts = life_facts[:200]  # pyre-ignore
         
         # Get reasoning output
         reasoning_output = ""
         try:
             # Run through reasoning modules
-            insight_gen = InsightGenerator()
+            insight_gen = TherapeuticInsight()
             insights_data = insight_gen.analyze_situation(
                 transcript, 
-                message_history[-5:] if message_history else [],
+                message_history[-5:] if message_history else [], # type: ignore
                 perception_data.get('tone', {}).get('overall_mood', 'neutral'),
                 perception_data.get('tone', {}).get('sentiment_score', 0.0)
             )
             
-            insights = []
+            insights: typing.List[str] = []
             if isinstance(insights_data, dict):
-                 if insights_data.get('recommendation'):
-                     insights.append(insights_data.get('recommendation'))
+                 rec = insights_data.get('recommendation')
+                 if isinstance(rec, str):
+                     insights.append(rec)
             
             # [LONG-TERM MEMORY INTEGRATION] Retrieve personalized context — capped at 150 chars
             pers_context = pers_memory.get_user_memory_context_formatted(user_id, transcript)
-            if pers_context:
-                insights.append(pers_context[:150])
+            if isinstance(pers_context, str) and pers_context:
+                insights.append(pers_context[:150])  # pyre-ignore
             
             reasoning_output = " | ".join(insights) if insights else ""
             # Cap total reasoning output
-            if len(reasoning_output) > 250:
-                reasoning_output = reasoning_output[:250]
+            if isinstance(reasoning_output, str) and len(reasoning_output) > 250:
+                reasoning_output = reasoning_output[:250]  # pyre-ignore
         except Exception as e:
             print(f"[WARNING] Reasoning analysis error: {e}")
         
@@ -1234,7 +1190,7 @@ def generate_response_data(perception_data, user_id, transcript, conversation_id
         for msg in message_history:
             if msg['content'] != transcript:
                 clean_history.append(msg)
-        clean_history = clean_history[-6:]  # hard cap: 6 history messages max
+        clean_history = clean_history[-6:]  # type: ignore # hard cap: 6 history messages max
                 
         # 2. Append the Enhanced User Prompt
         clean_history.append({
@@ -1367,7 +1323,7 @@ def validate_gemini_token():
             
             # Add default fields if missing
             if "error" not in result:
-                result["error"] = None if result.get("valid") else "UNKNOWN_ERROR"
+                typing.cast(typing.Dict[str, typing.Any], result)["error"] = None if result.get("valid") else "UNKNOWN_ERROR"
             
             # Store valid key in session
             if result.get("valid"):
@@ -1442,6 +1398,7 @@ def get_conversation_detail(conversation_id):
         print(f"Error fetching conversation detail: {e}")
         return jsonify({"success": False, "messages": [], "message": str(e)}), 500
             
+
 
 @app.route('/api/save-conversation-with-name', methods=['POST'])
 @login_required
@@ -1582,12 +1539,17 @@ def get_conversation_context(conversation_id):
             print(f"Error retrieving LTM: {e}")
             ltm_text = ""
         
+        messages_list = working_context.get('messages', [])
+        history_count = len(messages_list) if isinstance(messages_list, list) else 0
+        if not history_count:
+            history_count = len(ltm_text.split('\n')) if isinstance(ltm_text, str) else 0
+
         return jsonify({
             "success": True,
             "conversation_id": conversation_id,
             "working_memory": working_context,
             "long_term_memory": ltm_text,
-            "history_count": len(working_context.get('messages', [])) or len(ltm_text.split('\n'))
+            "history_count": history_count
         }), 200
     except Exception as e:
         print(f"Error in get_conversation_context: {e}")
@@ -1714,9 +1676,8 @@ def api_sync_history():
         # 3. Use thread for bulk analysis to avoid blocking
         def run_sync():
             try:
-                from utils.llm_client import generate_chat_response
                 api_key = session.get('gemini_api_key') or os.environ.get("GEMINI_API_KEY")
-                pers_memory.analyze_historical_data(user_id, all_convos, generate_chat_response, api_key=str(os.environ.get("GEMINI_API_KEY") or ""))
+                pers_memory.analyze_historical_data(user_id, all_convos, generate_chat_response, api_key=str(api_key or ""))
             except Exception as e:
                 print(f"[MEMORY SYNC ERROR] {e}")
 
@@ -1730,8 +1691,6 @@ def api_sync_history():
         
     except Exception as e:
         print(f"Error in api_sync_history: {e}")
-        return jsonify({"success": False, "message": str(e)}), 500
-
         return jsonify({"success": False, "message": str(e)}), 500
 
 # [NEW] Dashboard Routes
@@ -1800,53 +1759,107 @@ def api_dashboard_timeline():
 @app.route('/api/dashboard/report', methods=['GET'])
 @login_required
 def api_dashboard_report():
-    """Get medical and personal report for dashboard — merges LLM memory + regex extractor"""
+    """Get dynamic medical and personal report for dashboard using sentiment analysis and chat history"""
     user_id = current_user.id
     try:
-        # 1. Try LLM-extracted personalized memory first
-        raw_report = pers_memory.get_full_memory_report(user_id)
+        # Fetch user sessions from clinical engine
+        sessions = clinical_engine.store.get_user_sessions(user_id)
+        topic_freq = clinical_engine.engine.topic_frequency(sessions)
+        
+        latest_emotion = "Neutral"
+        latest_themes_str = "None detected"
+        if sessions:
+            latest_session = sessions[0]
+            latest_emotion = latest_session.get("emotion", "neutral").capitalize()
+            try:
+                import json
+                themes = json.loads(latest_session.get("themes", "[]"))
+                if themes:
+                    latest_themes_str = ", ".join(t.replace("_", " ").title() for t in themes)
+            except:
+                pass
+        msi = clinical_engine.engine.compute_mood_stability_index(sessions)
+        tps = clinical_engine.engine.compute_therapy_progress_score(sessions)
+        
+        total_sessions = max(len(sessions), 1)
 
-        medical_profile = []
-        for item in raw_report.get('medical_flags', []):
-            medical_profile.append(f"🏥 {item.get('key','Medical')}: {item.get('value','')}")
-        for item in raw_report.get('risk_indicators', []):
-            medical_profile.append(f"⚠️ Risk: {item.get('key','Risk')}: {item.get('value','')}")
+        # 1. Medical History Generation
+        anxiety_count = sum(1 for s in sessions if s.get('emotion') == 'anxiety')
+        anxiety_pct = anxiety_count / total_sessions
+        anxiety_level = "High" if anxiety_pct > 0.3 else "Moderate" if anxiety_pct > 0.1 else "Low"
 
-        personal_profile = []
-        for item in raw_report.get('important_identity', []):
-            personal_profile.append(f"👤 {item.get('key','')}: {item.get('value','')}")
-        for item in raw_report.get('life_story_events', []):
-            personal_profile.append(f"📌 Event: {item.get('value','')}")
-        for item in raw_report.get('recurring_themes', []):
-            personal_profile.append(f"🔄 Theme: {item.get('value','')}")
+        # Combine stress metrics
+        stress_count = sum(1 for s in sessions if s.get('emotion') == 'stress') + topic_freq.get('financial_stress', 0)
+        stress_pct = stress_count / total_sessions
+        stress_level = "High" if stress_pct > 0.3 else "Moderate" if stress_pct > 0.1 else "Low"
 
-        # 2. Augment with regex-extracted clinical data from transcripts
+        sleep_issues = topic_freq.get('insomnia', 0)
+        sleep_condition = "Poor (Frequent insomnia)" if sleep_issues > 2 else "Occasional disruptions" if sleep_issues > 0 else "Normal/Stable"
+
+        mood_stability = "Highly Stable" if msi >= 0.7 else "Moderate Variations" if msi >= 0.4 else "Highly Volatile"
+
+        emotion_counts = {}
+        for s in sessions:
+            e = s.get("emotion", "neutral")
+            emotion_counts[e] = emotion_counts.get(e, 0) + 1
+        sorted_emotions = sorted(emotion_counts.items(), key=lambda x: x[1], reverse=True)
+        top_emotions = [e[0].capitalize() for e in sorted_emotions[:2]] if sorted_emotions else ["Neutral"] # type: ignore
+        emotional_patterns = f"Dominant emotions: {', '.join(top_emotions)}"
+
+        medical_profile: typing.List[str] = [
+            f"➤ Current State: {latest_emotion} (Updated just now)",
+            f"Anxiety level: {anxiety_level}",
+            f"Stress level: {stress_level}",
+            f"Sleep condition: {sleep_condition}",
+            f"Mood stability: {mood_stability}",
+            f"Emotional patterns observed: {emotional_patterns}"
+        ]
+
+        # 2. Personal Profile Generation
+        work_academic = topic_freq.get('academic_pressure', 0) + topic_freq.get('work_career', 0)
+        work_pressure = "High" if work_academic > 2 else "Moderate" if work_academic > 0 else "Low/Manageable"
+
+        social = topic_freq.get('loneliness', 0) + topic_freq.get('social_anxiety', 0)
+        social_pattern = "Signs of isolation or social anxiety" if social > 1 else "Active/Normal interaction"
+
+        lifestyle = "Needs attention (potential sleep/stress impacts)" if sleep_issues > 0 or stress_level == "High" else "Generally balanced"
+
+        coping = "Adaptive" if tps > 0.1 else "Struggling (Needs support)" if tps < -0.1 else "Mixed/Inconsistent"
+
+        progress_note = "Showing positive response to sessions." if tps >= 0 else "Currently experiencing elevated difficulties."
+
+        personal_profile = [
+            f"➤ Active Topic: {latest_themes_str} (Updated just now)",
+            f"Work or academic pressure: {work_pressure}",
+            f"Social interaction pattern: {social_pattern}",
+            f"Lifestyle habits: {lifestyle}",
+            f"Coping behavior: {coping}",
+            f"Recovery progress notes: {progress_note}"
+        ]
+
+        # Fetch risk flags securely from existing method
         clinical_report = clinical_engine.get_medical_report(user_id)
-        extra_medical   = clinical_report.get("medical_history", [])
-        extra_personal  = clinical_report.get("personal_profile", [])
-        risk_flags      = clinical_report.get("risk_flags", [])
+        risk_flags = clinical_report.get("risk_flags", [])
 
-        if extra_medical and "No medical records detected yet" not in extra_medical[0]:
-            for item in extra_medical:
-                if item not in medical_profile:
-                    medical_profile.append(item)
+        # Get actual extracted profiles (filter out the default "No records" messages if they exist so we can cleanly append)
+        actual_med = clinical_report.get("medical_history", [])
+        actual_pers = clinical_report.get("personal_profile", [])
+        
+        if len(actual_med) == 1 and "No medical records" in actual_med[0]:
+            actual_med = []
+        if len(actual_pers) == 1 and "No personal profile" in actual_pers[0]:
+            actual_pers = []
 
-        if extra_personal and "No personal profile data detected yet" not in extra_personal[0]:
-            for item in extra_personal:
-                if item not in personal_profile:
-                    personal_profile.append(item)
-
-        if not medical_profile:
-            medical_profile = ["No medical records found. Keep chatting — they will appear automatically."]
-        if not personal_profile:
-            personal_profile = ["No personal profile data yet. As you chat, your profile builds automatically."]
+        # Prepend the actual extracted history above the analytical stats
+        combined_medical = actual_med + ["---"] + medical_profile if actual_med else medical_profile
+        combined_personal = actual_pers + ["---"] + personal_profile if actual_pers else personal_profile
 
         return jsonify({
             "success": True,
             "report": {
-                "medical_history":  medical_profile,
-                "personal_profile": personal_profile,
-                "risk_flags":       risk_flags,
+                "medical_history": combined_medical,
+                "personal_profile": combined_personal,
+                "risk_flags": risk_flags,
             }
         }), 200
     except Exception as e:
@@ -1926,6 +1939,9 @@ def api_user_risk_alerts(user_id):
 @app.errorhandler(404)
 def not_found(error):
     return jsonify({"error": "Endpoint not found."}), 404
+
+from change_password import change_password_bp # pyre-ignore[21]
+app.register_blueprint(change_password_bp)
 
 if __name__ == '__main__':
     app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5000)

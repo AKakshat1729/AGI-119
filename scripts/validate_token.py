@@ -1,14 +1,39 @@
-from utils.groq_client import validate_groq_token
-import json
 import os
 import sys
+from dotenv import load_dotenv
 
-token = os.environ.get('TEST_GROQ_TOKEN') or (sys.argv[1] if len(sys.argv) > 1 else '')
-api_url = os.environ.get('TEST_GROQ_API_URL') or (sys.argv[2] if len(sys.argv) > 2 else None)
+# 1. Fix the pathing so the script can see the 'utils' folder
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-if not token:
-	print('Usage: python scripts/validate_token.py <TOKEN> [API_URL]')
-	sys.exit(2)
+try:
+    # We use the Gemini-based client we cleaned up earlier
+    from utils.llm_client import validate_gemini_api_key
+    _llm_ready = True
+except ImportError as e:
+    _llm_ready = False
+    print(f"[ERROR] Could not find llm_client: {e}")
 
-res = validate_groq_token(token, api_url=api_url)
-print(json.dumps(res, indent=2))
+def run_validation():
+    print("--- AGI Token Validation ---")
+    load_dotenv()
+    
+    api_key = os.environ.get("GEMINI_API_KEY")
+    
+    if not api_key:
+        print("[FAIL] No GEMINI_API_KEY found in .env file.")
+        return
+
+    if _llm_ready:
+        print(f"Validating key: {api_key[:4]}...{api_key[-4:]}")
+        result = validate_gemini_api_key(api_key)
+        
+        if result.get("valid"):
+            print("[SUCCESS] Gemini Token is active and responding!")
+        else:
+            print(f"[FAIL] API Error: {result.get('message')}")
+            print(f"Details: {result.get('error')}")
+    else:
+        print("[SKIP] Validation logic missing. Ensure utils/llm_client.py exists.")
+
+if __name__ == "__main__":
+    run_validation()

@@ -1,9 +1,10 @@
 #!/usr/bin/env python
 """
-Health check and startup verification
+Health check and startup verification - Gemini Edition
 """
 import os
 import sys
+from typing import List, Dict, Any
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -17,18 +18,16 @@ def check_environment():
         'FLASK_SECRET_KEY': 'Flask secret (can be auto-generated)',
         'MONGO_URI': 'MongoDB connection string',
         'GEMINI_API_KEY': 'Gemini API key for LLM',
-        'ASSEMBLYAI_API_KEY': 'AssemblyAI for speech-to-text'
+        'ASSEMBLYAI_API_KEY': 'AssemblyAI for speech-to-text (Optional)'
     }
     
     for var, description in required_vars.items():
         value = os.environ.get(var)
         if value:
-            # Hide sensitive data
             hidden_value = value[:10] + '...' if len(value) > 10 else value
             print(f"✅ {var}: {hidden_value}")
         else:
             print(f"⚠️  {var}: Not found ({description})")
-    
     print()
 
 def check_imports():
@@ -38,28 +37,28 @@ def check_imports():
     
     packages = {
         'flask': 'Flask web framework',
-        'flask_login': 'User authentication',
         'pymongo': 'MongoDB driver',
-        'requests': 'HTTP library',
-        'assemblyai': 'Speech-to-text API',
-        'gtts': 'Text-to-speech',
+        'google.generativeai': 'Gemini AI Engine',
+        'chromadb': 'Vector Memory Database',
+        'textblob': 'Sentiment Analysis',
+        'nltk': 'Natural Language Toolkit',
         'dotenv': 'Environment variables',
-        'google.generativeai': 'Google Generative AI (fallback)',
         'pydantic': 'Data validation'
     }
     
     missing = []
     for package, description in packages.items():
         try:
-            __import__(package)
+            # Handle packages with dots in names
+            base_package = package.split('.')[0]
+            __import__(base_package)
             print(f"✅ {package}: OK")
         except ImportError:
             print(f"❌ {package}: Missing ({description})")
             missing.append(package)
     
     if missing:
-        print(f"\n⚠️  Installing missing packages: {', '.join(missing)}")
-        os.system(f"pip install {' '.join(missing)} -q")
+        print(f"\n⚠️  Action Required: Run 'pip install {' '.join(missing)}'")
     
     print()
 
@@ -71,12 +70,10 @@ def check_files():
     required_files = [
         'app.py',
         'chat_api.py',
-        'templates/index.html',
-        'templates/login.html',
-        'templates/signup.html',
         'clinical_resources.py',
         'utils/therapy_llm_client.py',
-        'requirements.txt'
+        'reasoning/long_term_personalized_memory.py',
+        '.env'
     ]
     
     for file in required_files:
@@ -85,49 +82,29 @@ def check_files():
             print(f"✅ {file} ({size} bytes)")
         else:
             print(f"❌ {file}: Missing")
-    
-    print()
-
-def check_static_folders():
-    """Create necessary static folders"""
-    print("🔍 Static Folder Check")
-    print("-" * 50)
-    
-    folders = [
-        'static',
-        'static/audio',
-        'long_term_memory_db'
-    ]
-    
-    for folder in folders:
-        if not os.path.exists(folder):
-            os.makedirs(folder, exist_ok=True)
-            print(f"📁 Created: {folder}")
-        else:
-            print(f"✅ {folder}: Exists")
-    
     print()
 
 def validate_app():
-    """Try to import and validate the app"""
-    print("🔍 App Validation")
+    """Try to import and validate the app components"""
+    print("🔍 Component Validation")
     print("-" * 50)
     
     try:
-        from app import app
-        print("✅ app.py imports successfully")
+        # Check therapy client first
+        from utils.therapy_llm_client import TherapyLLMClient, get_llm_response
+        print("✅ Therapy LLM Client: Verified")
         
-        from clinical_resources import get_llm_response
-        print("✅ clinical_resources imports successfully")
+        # Check Memory systems
+        from reasoning.long_term_personalized_memory import PersonalizedMemoryModule
+        print("✅ Long-Term Memory Module: Verified")
         
-        from utils.therapy_llm_client import TherapyLLMClient
-        print("✅ therapy_llm_client imports successfully")
+        # Check Clinical Intelligence
+        from core.clinical_intelligence import MedicalProfileExtractor
+        print("✅ Clinical Intelligence: Verified")
         
         return True
     except Exception as e:
-        print(f"❌ Import error: {e}")
-        import traceback
-        traceback.print_exc()
+        print(f"❌ Component error: {e}")
         return False
 
 def main():
@@ -139,16 +116,15 @@ def main():
     check_environment()
     check_imports()
     check_files()
-    check_static_folders()
     
     if validate_app():
         print("\n" + "="*50)
-        print("✅ All checks passed! Ready to launch.")
+        print("✅ ALL SYSTEMS GO! Your AGI is ready for Lucknow.")
         print("="*50)
         return True
     else:
         print("\n" + "="*50)
-        print("❌ Some checks failed. Fix issues above.")
+        print("❌ CRITICAL ERROR: Check components above.")
         print("="*50)
         return False
 

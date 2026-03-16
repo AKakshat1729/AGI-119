@@ -58,17 +58,24 @@ class WorkingMemory:
         Retrieves all documents sorted chronologically.
         """
         try:
-            data = self.collection.get()
-            docs = data.get("documents", [])
-            metas = data.get("metadatas", [])
-            ids = data.get("ids", [])
+            # 1. Safety first: If get() fails, data becomes an empty dict
+            data = self.collection.get() or {}
             
-            # Combine into a list of dicts
+            # 2. Ensure these are always lists, never None
+            docs = data.get("documents") or []
+            metas = data.get("metadatas") or []
+            ids = data.get("ids") or []
+            
             combined = []
             for i in range(len(ids)):
                 timestamp = ""
-                if metas and i < len(metas) and metas[i]:
-                    timestamp = metas[i].get("timestamp", "")
+                
+                # 3. Use a safe 'target' variable for the metadata entry
+                if metas and i < len(metas):
+                    m = metas[i]
+                    # This check ensures 'm' is a dictionary before calling .get()
+                    if isinstance(m, dict):
+                        timestamp = str(m.get("timestamp", ""))
                 
                 combined.append({
                     "id": ids[i],
