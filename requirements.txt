@@ -1,24 +1,23 @@
-websockets
-sounddevice
-textblob
-nltk
-numpy
+# Web Framework & API
 flask
-flask-login
-flask-cors
-aiohttp
-requests
-watchdog
-chromadb
-librosa
-assemblyai
-python-dotenv
-gtts
-pyttsx3
-pymongo
 fastapi
 uvicorn
 pydantic
-httpx
-groq
- 
+python-dotenv
+requests
+
+# AGI & LLM Core
+google-generativeai
+google-genai
+textblob
+nltk
+
+# Memory & Reasoning
+chromadb
+sentence-transformers
+pandas
+numpy
+
+# Perception (Speech & Audio)
+assemblyai
+gTTS

@@ -5,491 +5,596 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Settings - AGI-119</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
     <style>
-        :root { --accent-color: #667eea; }
-        /* Dark Mode Support */
-        body.dark-mode {
-            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
-            color: #e0e0e0;
+        :root {
+            --accent-color: #667eea;
+            --primary-bg: #f8f9fa;
+            --text-color: #333;
+            --border-color: #dee2e6;
+            --scrollbar-bg: rgba(0, 0, 0, 0.05);
+            --scrollbar-thumb: rgba(0, 0, 0, 0.2);
         }
 
-        body.dark-mode .container {
-            color: #e0e0e0;
+        body.dark-mode {
+            --primary-bg: #1a1a1a;
+            --text-color: #e0e0e0;
+            --border-color: #404040;
+            --scrollbar-bg: rgba(255, 255, 255, 0.05);
+            --scrollbar-thumb: rgba(255, 255, 255, 0.2);
+            background: linear-gradient(135deg, #2c3e50 0%, #34495e 100%);
+        }
+
+        body {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: var(--text-color);
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: var(--scrollbar-bg);
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: var(--scrollbar-thumb);
+            border-radius: 3px;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 20px auto;
+        }
+
+        .card {
+            background: var(--primary-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            margin-bottom: 20px; 
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+
+        .card-header {
+            background: #667eea;
+            color: white;
+            border-radius: 10px 10px 0 0;
+            padding: 15px;
+            font-weight: bold;
         }
 
         body.dark-mode .card {
             background: #2d2d2d;
             border-color: #404040;
-            color: #e0e0e0;
         }
 
-        body.dark-mode .card-header {
-            background: #1a1a1a;
-            border-bottom-color: #404040;
-            color: #e0e0e0;
+        .btn-back {
+            background: #667eea;
+            color: white;
+            padding: 10px 15px;
+            border-radius: 5px;
+            text-decoration: none;
+            display: inline-block;
+            margin-bottom: 20px;
         }
 
-        body.dark-mode .form-label {
-            color: #e0e0e0;
+        .btn-back:hover {
+            background: #5568d3;
+            color: white;
+        }
+
+        .form-control, .form-select, textarea {
+            background: white;
+            color: var(--text-color);
+            border: 1px solid var(--border-color);
         }
 
         body.dark-mode .form-control,
-        body.dark-mode .form-select {
+        body.dark-mode .form-select,
+        body.dark-mode textarea {
             background: #3d3d3d;
             border-color: #555;
             color: #e0e0e0;
         }
 
-        body.dark-mode .form-control:focus,
-        body.dark-mode .form-select:focus {
-            background: #3d3d3d;
-            border-color: var(--accent-color);
-            color: #e0e0e0;
-            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.18);
+        .form-control:focus,
+        .form-select:focus,
+        textarea:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
         }
 
-        body.dark-mode .btn-outline-secondary {
-            color: #e0e0e0;
-            border-color: #555;
-        }
-
-        body.dark-mode .btn-outline-secondary:hover {
-            background: #555;
-            border-color: #555;
-        }
-
-        body.dark-mode .form-check-input {
-            background: #3d3d3d;
-            border-color: #555;
-        }
-
-        body.dark-mode .form-check-input:checked {
-            background: var(--accent-color);
-            border-color: var(--accent-color);
-        }
-
-        body.dark-mode .alert-info {
-            background: #1a4d6d;
-            border-color: #2e7d99;
-            color: #a8d5e2;
-        }
-
-        body.dark-mode .alert-info a {
-            color: #82b8d1;
-            text-decoration: underline;
-        }
-
-        body.dark-mode .text-muted {
-            color: #999 !important;
-        }
-
-        body.dark-mode .btn-secondary {
-            background: #555;
-            border-color: #555;
-        }
-
-        body.dark-mode .btn-secondary:hover {
-            background: #666;
-            border-color: #666;
-        }
         .btn-primary {
-            background: var(--accent-color);
-            border-color: var(--accent-color);
+            background: #667eea;
+            border: none;
         }
+
         .btn-primary:hover {
-            background: color-mix(in srgb, var(--accent-color) 80%, black 20%);
-            border-color: color-mix(in srgb, var(--accent-color) 80%, black 20%);
+            background: #5568d3;
         }
 
-        .api-key-input {
-            font-family: 'Courier New', monospace;
-            font-size: 0.9rem;
-            letter-spacing: 0.05em;
+        .btn-success {
+            background: #28a745;
         }
-        .api-key-status {
-            font-size: 0.9rem;
-            margin-top: 0.5rem;
+
+        .btn-danger {
+            background: #dc3545;
         }
-        .api-key-status.valid {
+
+        .alert {
+            border-radius: 5px;
+            margin-bottom: 15px;
+        }
+
+        .settings-group {
+            padding: 15px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .settings-group:last-child {
+            border-bottom: none;
+        }
+
+        .settings-label {
+            font-weight: bold;
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        .chart-container {
+            position: relative;
+            height: 300px;
+            margin: 20px 0;
+        }
+
+        .stat-box {
+            background: #667eea;
+            color: white;
+            padding: 20px;
+            border-radius: 5px;
+            text-align: center;
+            margin: 10px 0;
+        }
+
+        body.dark-mode .stat-box {
+            background: #5568d3;
+        }
+
+        .stat-number {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .stat-label {
+            font-size: 12px;
+            opacity: 0.9;
+        }
+
+        .history-item {
+            padding: 10px;
+            border-left: 3px solid #667eea;
+            background: #f0f2f5;
+            margin: 5px 0;
+            border-radius: 3px;
+            font-size: 12px;
+        }
+
+        body.dark-mode .history-item {
+            background: #3d3d3d;
+        }
+
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 50px;
+            height: 24px;
+        }
+
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: 0.4s;
+            border-radius: 24px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 3px;
+            bottom: 3px;
+            background-color: white;
+            transition: 0.4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #667eea;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(26px);
+        }
+
+        @media (max-width: 768px) {
+            .container {
+                margin: 10px;
+            }
+
+            .card {
+                margin-bottom: 15px;
+            }
+
+            .chart-container {
+                height: 250px;
+            }
+
+            .stat-box {
+                padding: 15px;
+            }
+        }
+
+        .success-msg {
             color: #28a745;
+            font-weight: bold;
+            font-size: 12px;
+            margin-top: 5px;
+            display: none;
         }
-        .api-key-status.invalid {
+
+        .error-msg {
             color: #dc3545;
-        }
-        .api-key-status.validating {
-            color: #ffc107;
-        }
-        .api-error-box {
-            background-color: #f8d7da;
-            border: 1px solid #f5c6cb;
-            border-radius: 0.25rem;
-            padding: 0.75rem 1.25rem;
-            margin-bottom: 1rem;
-            color: #721c24;
-        }
-        .api-success-box {
-            background-color: #d4edda;
-            border: 1px solid #c3e6cb;
-            border-radius: 0.25rem;
-            padding: 0.75rem 1.25rem;
-            margin-bottom: 1rem;
-            color: #155724;
-        }
-
-        /* Dark mode for error/success boxes */
-        body.dark-mode .api-error-box {
-            background-color: #5d2e2e;
-            border-color: #8b4545;
-            color: #ff9999;
-        }
-
-        body.dark-mode .api-success-box {
-            background-color: #2e5d3d;
-            border-color: #458b65;
-            color: #99ff99;
-        }
-
-        .settings-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 30px;
-        }
-        .spinner-border-sm {
-            width: 1rem;
-            height: 1rem;
+            font-weight: bold;
+            font-size: 12px;
+            margin-top: 5px;
+            display: none;
         }
     </style>
 </head>
 <body>
-    <div class="container mt-5">
-        <div class="settings-header">
-            <h2 class="mb-0">Settings</h2>
-        </div>
-        {% with messages = get_flashed_messages() %}
-            {% if messages %}
-                {% for message in messages %}
-                    <div class="alert alert-info">{{ message }}</div>
-                {% endfor %}
-            {% endif %}
-        {% endwith %}
+    <div class="container">
+        <a href="/" class="btn-back">← Back to Chat</a>
 
-        <!-- Groq Token Settings -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">Groq Configuration</h5>
-            </div>
+        <!-- PROFILE SECTION -->
+        <div class="card">
+            <div class="card-header">👤 Profile</div>
             <div class="card-body">
-                <div class="alert alert-info" role="alert">
-                    <strong>Note:</strong> Use a Groq API token only.
-                    Get your token from <a href="https://console.groq.com/keys" target="_blank">Groq</a>.
+                <div class="settings-group">
+                    <label class="settings-label">Username</label>
+                    <input type="text" class="form-control" id="username" placeholder="Your name" />
+                </div>
+                <div class="settings-group">
+                    <label class="settings-label">Email</label>
+                    <input type="email" class="form-control" id="useremail" placeholder="Your email" readonly />
+                </div>
+            </div>
+        </div>
+
+        <!-- GEMINI API KEY SECTION -->
+        <div class="card">
+            <div class="card-header">🔑 Gemini API Configuration</div>
+            <div class="card-body">
+                <div class="settings-group">
+                    <label class="settings-label">Gemini API Key</label>
+                    <p style="font-size: 12px; color: #666; margin-bottom: 10px;">Your API key is stored securely and used for generating intelligent responses.</p>
+                    <div style="display: flex; gap: 10px;">
+                        <input type="password" class="form-control" id="geminiKey" placeholder="Paste your Gemini API key here" />
+                        <button class="btn btn-primary" onclick="updateGeminiKey()" style="min-width: 100px;">Update</button>
+                    </div>
+                    <div class="success-msg" id="geminiSuccess">✓ Gemini API key updated successfully</div>
+                    <div class="error-msg" id="geminiError"></div>
+                </div>
+                
+                <div class="settings-group">
+                    <label class="settings-label">API Usage & Quota</label>
+                    <div style="background: rgba(0,0,0,0.05); padding: 15px; border-radius: 8px; border: 1px solid var(--border-color);">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span>Daily Requests</span>
+                            <span style="font-weight: bold;"><span id="usageCount">0</span> / <span id="quotaLimit">100</span></span>
+                        </div>
+                        <div class="progress" style="height: 10px; background: #e9ecef; border-radius: 5px; overflow: hidden;">
+                            <div id="usageBar" class="progress-bar" role="progressbar" style="width: 0%; background: var(--accent-color);"></div>
+                        </div>
+                        <p style="font-size: 11px; color: var(--text-secondary); margin-top: 8px; margin-bottom: 0;">
+                            Usage resets daily. Quota is estimated based on typical free tier limits.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- THEME SETTINGS -->
+        <div class="card">
+            <div class="card-header">🎨 Theme Settings</div>
+            <div class="card-body">
+                <div class="settings-group">
+                    <label class="settings-label">Dark Mode</label>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="darkModeToggle" onchange="toggleDarkMode()">
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="settings-group">
+                    <label class="settings-label">Theme Color</label>
+                    <input type="color" class="form-control" id="themeColor" value="#667eea" onchange="saveTheme()" style="height: 40px;" />
+                </div>
+            </div>
+        </div>
+
+        <!-- PREFERENCES -->
+        <div class="card">
+            <div class="card-header">⚙️ Preferences</div>
+            <div class="card-body">
+                <div class="settings-group">
+                    <label class="settings-label">Therapeutic Style</label>
+                    <select class="form-select" id="therapeuticStyle" onchange="savePreferences()">
+                        <option value="empathetic">Empathetic</option>
+                        <option value="practical">Practical</option>
+                        <option value="analytical">Analytical</option>
+                        <option value="supportive">Supportive</option>
+                    </select>
+                </div>
+                <div class="settings-group">
+                    <label class="settings-label">Max Response Tokens</label>
+                    <input type="number" class="form-control" id="maxTokens" min="100" max="4000" value="1000" onchange="savePreferences()" />
+                </div>
+                <div class="settings-group">
+                    <label class="settings-label">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="audioEnabled" onchange="savePreferences()">
+                            <span class="slider"></span>
+                        </label>
+                        Enable Audio Input
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <!-- ANALYTICS DASHBOARD -->
+        <div class="card">
+            <div class="card-header">📊 Chat Analytics</div>
+            <div class="card-body" id="analyticsSection">
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 20px;">
+                    <div class="stat-box">
+                        <div class="stat-number" id="totalMessages">0</div>
+                        <div class="stat-label">Total Messages</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number" id="userMessages">0</div>
+                        <div class="stat-label">Your Messages</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number" id="aiMessages">0</div>
+                        <div class="stat-label">AI Responses</div>
+                    </div>
+                    <div class="stat-box">
+                        <div class="stat-number" id="avgDaily">0</div>
+                        <div class="stat-label">Avg Daily</div>
+                    </div>
                 </div>
 
-                <form id="apiKeyForm" onsubmit="handleApiKeySubmit(event)">
-                    <!-- Token Input -->
-                    <div class="mb-3">
-                        <label for="groqApiToken" class="form-label">Groq API Token</label>
-                        <div class="input-group">
-                            <input 
-                                type="password" 
-                                class="form-control api-key-input" 
-                                id="groqApiToken" 
-                                name="groq_api_token"
-                                placeholder="Paste your Groq API token here"
-                                autocomplete="off"
-                            >
-                            <button 
-                                class="btn btn-outline-secondary" 
-                                type="button" 
-                                id="toggleApiKeyVisibility"
-                                onclick="toggleApiKeyVisibility()"
-                            >
-                                👁️
-                            </button>
-                        </div>
-                        <small class="form-text text-muted">Your token is stored in session for convenience; server env takes precedence.</small>
-                    </div>
-
-                    <div id="apiKeyStatus" class="api-key-status" style="display: none;"></div>
-                    <div id="apiKeyMessage" class="mt-2" style="display: none;"></div>
-
-                    <div class="mb-3">
-                        <button type="button" class="btn btn-outline-primary me-2" onclick="validateApiKey()">
-                            Validate Token
-                        </button>
-                        <button type="submit" class="btn btn-primary" id="saveApiKeyBtn">
-                            Save Token
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Theme Settings -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">Appearance</h5>
-            </div>
-            <div class="card-body">
-                <form method="POST" action="/settings/theme">
-                    <div class="mb-3">
-                        <label class="form-label">Theme Preference</label>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="theme" id="light" value="light" {{ 'checked' if not (user_settings or {}).get('dark_mode', False) else '' }}>
-                            <label class="form-check-label" for="light">
-                                Light Mode
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="theme" id="dark" value="dark" {{ 'checked' if (user_settings or {}).get('dark_mode', False) else '' }}>
-                            <label class="form-check-label" for="dark">
-                                Dark Mode
-                            </label>
-                        </div>
-                    </div>
-                    <div class="mb-3">
-                        <label class="form-label">Theme Color</label>
-                        <div class="d-flex align-items-center">
-                            <input type="color" id="themeColor" name="theme_color" value="{{ (user_settings or {}).get('theme_color', '#667eea') }}" class="form-control form-control-color me-3" style="width:70px; padding:0;">
-                            <div id="colorPreview"
-                                 style="width:36px;height:36px;border-radius:6px;border:1px solid #ccc"
-                                 data-initial-color="{{ user_settings.theme_color if user_settings else '#667eea' }}">
-                            </div>
-                        </div>
-                        <small class="form-text text-muted">Pick the primary theme color used for accents.</small>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Save Theme</button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Conversation Settings -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">Conversation Settings</h5>
-            </div>
-            <div class="card-body">
-                <form method="POST" action="/settings/conversation">
-                    <div class="mb-3">
-                        <label for="max_tokens" class="form-label">Max Response Length</label>
-                        <select class="form-select" id="max_tokens" name="max_tokens">
-                            <option value="200" {{ 'selected' if (user_settings or {}).get('max_tokens', 500) == 200 else '' }}>Short (200 tokens)</option>
-                            <option value="500" {{ 'selected' if (user_settings or {}).get('max_tokens', 500) == 500 else '' }}>Medium (500 tokens)</option>
-                            <option value="1000" {{ 'selected' if (user_settings or {}).get('max_tokens', 500) == 1000 else '' }}>Long (1000 tokens)</option>
-                        </select>
-                    </div>
-                    <div class="mb-3">
-                        <label for="therapeutic_style" class="form-label">Therapeutic Style</label>
-                        <select class="form-select" id="therapeutic_style" name="therapeutic_style">
-                            <option value="empathetic" {{ 'selected' if (user_settings or {}).get('therapeutic_style', 'empathetic') == 'empathetic' else '' }}>Empathetic</option>
-                            <option value="direct" {{ 'selected' if (user_settings or {}).get('therapeutic_style', 'empathetic') == 'direct' else '' }}>Direct</option>
-                            <option value="supportive" {{ 'selected' if (user_settings or {}).get('therapeutic_style', 'empathetic') == 'supportive' else '' }}>Supportive</option>
-                        </select>
-                    </div>
-                    <div class="mb-3 form-check">
-                        <input type="checkbox" class="form-check-input" id="enable_audio" name="enable_audio" {{ 'checked' if (user_settings or {}).get('enable_audio', True) else '' }}>
-                        <label class="form-check-label" for="enable_audio">Enable Audio Responses</label>
-                    </div>
-                    <button type="submit" class="btn btn-primary">Save Conversation Settings</button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Privacy & Data -->
-        <div class="card mb-4">
-            <div class="card-header">
-                <h5 class="mb-0">Privacy & Data</h5>
-            </div>
-            <div class="card-body">
-                <div class="mb-3">
-                    <h6>Data Management</h6>
-                    <p class="text-muted small">Your conversations are stored securely and used to provide personalized therapeutic support.</p>
+                <div class="chart-container">
+                    <canvas id="conditionsChart"></canvas>
                 </div>
-                <button type="button" class="btn btn-outline-danger" onclick="confirmDataDeletion()">Delete All Conversation Data</button>
             </div>
         </div>
 
-        <a href="{{ url_for('index') }}" class="btn btn-secondary">Back to Chat</a>
+        <!-- CHAT HISTORY -->
+        <div class="card">
+            <div class="card-header">📜 Recent Messages (Last 20)</div>
+            <div class="card-body" id="historySection">
+                <!-- History will be loaded here -->
+            </div>
+        </div>
     </div>
 
     <script>
-        let apiKeyValidationInProgress = false;
+        let conditionsChart = null;
 
-        // Apply server-side theme preference on load and react to changes
         document.addEventListener('DOMContentLoaded', function() {
-            // Initial apply based on the radio state (rendered by server)
-            const darkRadio = document.getElementById('dark');
-            const lightRadio = document.getElementById('light');
-            if (darkRadio && darkRadio.checked) {
-                document.body.classList.add('dark-mode');
-            } else {
-                document.body.classList.remove('dark-mode');
-            }
-
-            // Apply theme color
-            const themeColorInput = document.getElementById('themeColor');
-            if (themeColorInput) {
-                document.body.style.setProperty('--accent-color', themeColorInput.value || '#667eea');
-                const preview = document.getElementById('colorPreview');
-                if (preview) preview.style.background = themeColorInput.value;
-                themeColorInput.addEventListener('input', function() {
-                    document.body.style.setProperty('--accent-color', this.value);
-                    if (preview) preview.style.background = this.value;
-                });
-            }
-
-            // When the user toggles theme radios, apply immediately
-            if (darkRadio) {
-                darkRadio.addEventListener('change', function() {
-                    if (this.checked) document.body.classList.add('dark-mode');
-                });
-            }
-            if (lightRadio) {
-                lightRadio.addEventListener('change', function() {
-                    if (this.checked) document.body.classList.remove('dark-mode');
-                });
-            }
+            loadSettings();
+            loadAnalytics();
+            loadHistory();
+            checkTheme();
         });
 
-        function toggleApiKeyVisibility() {
-            const keyInput = document.getElementById('groqApiToken');
-            const btn = document.getElementById('toggleApiKeyVisibility');
-
-            if (!keyInput) return;
-            if (keyInput.type === 'password') {
-                keyInput.type = 'text';
-                btn.textContent = '🙈';
-            } else {
-                keyInput.type = 'password';
-                btn.textContent = '👁️';
-            }
-        }
-
-        async function validateApiKey() {
-            const apiKeyInput = document.getElementById('groqApiToken');
-            const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
-            const statusDiv = document.getElementById('apiKeyStatus');
-            const messageDiv = document.getElementById('apiKeyMessage');
-
-            if (!apiKey) {
-                statusDiv.style.display = 'block';
-                statusDiv.className = 'api-key-status invalid';
-                statusDiv.textContent = '⚠️ Please enter an API key';
-                return;
-            }
-
-            apiKeyValidationInProgress = true;
-            statusDiv.style.display = 'block';
-            statusDiv.className = 'api-key-status validating';
-            statusDiv.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Validating...';
-
-            try {
-                const response = await fetch('/api/validate-groq-token', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify({ api_key: apiKey })
-                });
-
-                const data = await response.json();
-
-                if (data.valid) {
-                    statusDiv.className = 'api-key-status valid';
-                    statusDiv.textContent = '✓ Token is valid';
-                    messageDiv.style.display = 'block';
-                    messageDiv.className = 'api-success-box';
-                    messageDiv.textContent = 'Your API key is working correctly!';
-                } else {
-                    statusDiv.className = 'api-key-status invalid';
-                    statusDiv.textContent = '✗ Invalid token';
-                    messageDiv.style.display = 'block';
-                    messageDiv.className = 'api-error-box';
-                    messageDiv.textContent = data.message || 'The API key is invalid. Please check and try again.';
-                }
-            } catch (error) {
-                statusDiv.className = 'api-key-status invalid';
-                statusDiv.textContent = '✗ Validation failed';
-                messageDiv.style.display = 'block';
-                messageDiv.className = 'api-error-box';
-                messageDiv.textContent = 'Error validating API key: ' + error.message;
-            } finally {
-                apiKeyValidationInProgress = false;
-            }
-        }
-
-        async function handleApiKeySubmit(event) {
-            event.preventDefault();
-            
-            const apiKeyInput = document.getElementById('groqApiToken');
-            const apiKey = apiKeyInput ? apiKeyInput.value.trim() : '';
-            const messageDiv = document.getElementById('apiKeyMessage');
-
-            if (!apiKey) {
-                messageDiv.style.display = 'block';
-                messageDiv.className = 'api-error-box';
-                messageDiv.textContent = '⚠️ Please enter an API key';
-                return;
-            }
-
-            try {
-                const response = await fetch('/api/save-groq-token', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    credentials: 'include',
-                    body: JSON.stringify({ api_key: apiKey })
-                });
-
-                const data = await response.json();
-
-                messageDiv.style.display = 'block';
-                if (data.success) {
-                    messageDiv.className = 'api-success-box';
-                    messageDiv.textContent = '✓ API key saved successfully!';
-                    setTimeout(() => {
-                        if (apiKeyInput) apiKeyInput.value = '';
-                    }, 1000);
-                } else {
-                    messageDiv.className = 'api-error-box';
-                    messageDiv.textContent = '✗ Error saving API key: ' + (data.message || 'Unknown error');
-                }
-            } catch (error) {
-                messageDiv.style.display = 'block';
-                messageDiv.className = 'api-error-box';
-                messageDiv.textContent = 'Error saving API key: ' + error.message;
-            }
-        }
-
-        function confirmDataDeletion() {
-            if (confirm('Are you sure you want to delete all your conversation data? This action cannot be undone.')) {
-                fetch('/settings/delete_data', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    credentials: 'include'
-                })
-                .then(response => response.json())
+        function loadSettings() {
+            fetch('/api/settings', { credentials: 'include' })
+                .then(res => res.json())
                 .then(data => {
-                    alert(data.message || 'Data deleted successfully');
-                    location.reload();
+                    if (data.settings) {
+                        const s = data.settings;
+                        document.getElementById('darkModeToggle').checked = s.dark_mode || false;
+                        document.getElementById('themeColor').value = s.theme_color || '#667eea';
+                        document.getElementById('therapeuticStyle').value = s.therapeutic_style || 'empathetic';
+                        document.getElementById('maxTokens').value = s.max_tokens || 1000;
+                        document.getElementById('audioEnabled').checked = s.enable_audio || true;
+                        
+                        // Usage Stats
+                        const usage = s.usage_count || 0;
+                        const quota = s.quota_limit || 100;
+                        document.getElementById('usageCount').textContent = usage;
+                        document.getElementById('quotaLimit').textContent = quota;
+                        
+                        const pct = Math.min(100, (usage / quota) * 100);
+                        const bar = document.getElementById('usageBar');
+                        bar.style.width = pct + '%';
+                        
+                        if (pct > 90) bar.style.backgroundColor = '#dc3545';
+                        else if (pct > 70) bar.style.backgroundColor = '#ffc107';
+                        else bar.style.backgroundColor = '#28a745';
+                    }
                 })
-                .catch(error => {
-                    alert('Error deleting data: ' + error.message);
-                });
-            }
+                .catch(err => console.error('Error loading settings:', err));
         }
 
-        // Auto-validate token on paste
-        const pasteEl = document.getElementById('groqApiToken');
-        if (pasteEl) {
-            pasteEl.addEventListener('paste', function() {
-                setTimeout(() => {
-                    validateApiKey();
-                }, 100);
+        function loadAnalytics() {
+            fetch('/api/analytics/chat-stats?days=30', { credentials: 'include' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('totalMessages').textContent = data.total_messages;
+                        document.getElementById('userMessages').textContent = data.user_messages;
+                        document.getElementById('aiMessages').textContent = data.ai_messages;
+                        document.getElementById('avgDaily').textContent = data.avg_daily?.toFixed(1) || '0';
+                    }
+                })
+                .catch(err => console.error('Error loading analytics:', err));
+
+            fetch('/api/analytics/health?days=30', { credentials: 'include' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.conditions) {
+                        drawConditionsChart(data.conditions);
+                    }
+                })
+                .catch(err => console.error('Error loading health analytics:', err));
+        }
+
+        function drawConditionsChart(conditions) {
+            const ctx = document.getElementById('conditionsChart').getContext('2d');
+            
+            if (conditionsChart) {
+                conditionsChart.destroy();
+            }
+
+            const labels = conditions.map(c => c._id || 'Unknown');
+            const data = conditions.map(c => c.count);
+            const colors = ['#667eea', '#764ba2', '#f093fb', '#4facfe', '#00f2fe'];
+
+            conditionsChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels === [] ?  ['No data yet'] : labels,
+                    datasets: [{
+                        data: data.length === 0 ? [1] : data,
+                        backgroundColor: colors.slice(0, Math.max(labels.length, 1)),
+                        borderColor: '#fff',
+                        borderWidth: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom'
+                        }
+                    }
+                }
             });
+        }
+
+        function loadHistory() {
+            fetch('/api/user-history?limit=20', { credentials: 'include' })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.success && data.history) {
+                        const historyDiv = document.getElementById('historySection');
+                        historyDiv.innerHTML = '';
+                        
+                        if (data.history.length === 0) {
+                            historyDiv.innerHTML = '<p style="text-align: center; color: #999;">No chat history yet</p>';
+                            return;
+                        }
+
+                        data.history.forEach(msg => {
+                            const item = document.createElement('div');
+                            item.className = 'history-item';
+                            item.innerHTML = `
+                                <strong>${msg.text.substring(0, 5)}...</strong>: ${msg.text.substring(0, 60)}...
+                                <br><small style="opacity: 0.7;">${new Date(msg.timestamp).toLocaleString()}</small>
+                            `;
+                            historyDiv.appendChild(item);
+                        });
+                    }
+                })
+                .catch(err => console.error('Error loading history:', err));
+        }
+
+        function updateGeminiKey() {
+            const key = document.getElementById('geminiKey').value.trim();
+            const successMsg = document.getElementById('geminiSuccess');
+            const errorMsg = document.getElementById('geminiError');
+            
+            successMsg.style.display = 'none';
+            errorMsg.style.display = 'none';
+
+            if (!key) {
+                errorMsg.textContent = '❌ Please enter an API key';
+                errorMsg.style.display = 'block';
+                return;
+            }
+
+            fetch('/api/settings/gemini-key', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ api_key: key })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.success) {
+                    successMsg.style.display = 'block';
+                    document.getElementById('geminiKey').value = '';
+                    setTimeout(() => successMsg.style.display = 'none', 3000);
+                } else {
+                    errorMsg.textContent = '❌ ' + (data.message || 'Error saving key');
+                    errorMsg.style.display = 'block';
+                }
+            })
+            .catch(err => {
+                errorMsg.textContent = '❌ Error: ' + err.message;
+                errorMsg.style.display = 'block';
+            });
+        }
+
+        function toggleDarkMode() {
+            const isDark = document.getElementById('darkModeToggle').checked;
+            document.body.classList.toggle('dark-mode', isDark);
+            saveTheme();
+        }
+
+        function saveTheme() {
+            const theme = document.body.classList.contains('dark-mode') ? 'dark' : 'light';
+            const darkMode = document.getElementById('darkModeToggle').checked;
+            const themeColor = document.getElementById('themeColor').value;
+
+            fetch('/api/settings/theme', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({
+                    theme: theme,
+                    dark_mode: darkMode,
+                    theme_color: themeColor
+                })
+            })
+            .catch(err => console.error('Error saving theme:', err));
+        }
+
+        function savePreferences() {
+            // Could add endpoint to save preferences
+            console.log('Preferences updated');
+        }
+
+        function checkTheme() {
+            if (localStorage.getItem('darkMode') === 'true') {
+                document.body.classList.add('dark-mode');
+            }
         }
     </script>
 </body>

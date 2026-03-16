@@ -20,11 +20,11 @@ def main():
     print("\n📋 Checking environment configuration...")
     
     if not (os.getenv("GROQ_API_KEY")):
-        print("⚠️  WARNING: No Groq API key set in .env file")
+        print("[WARNING] WARNING: No Groq API key set in .env file")
         print("   You can update your Groq API key in Settings after signup")
     
     if not os.getenv("ASSEMBLYAI_API_KEY"):
-        print("⚠️  WARNING: ASSEMBLYAI_API_KEY not set in .env file")
+        print("[WARNING] WARNING: ASSEMBLYAI_API_KEY not set in .env file")
     
     # Create processes list
     processes = []
@@ -55,7 +55,7 @@ def main():
         processes.append(("Flask Web Server", flask_process))
         
         print("\n" + "=" * 60)
-        print("✅ Application Started Successfully!")
+        print("[OK] Application Started Successfully!")
         print("=" * 60)
         print("\n📝 Configuration Notes:")
         print("   • Set GROQ_API_KEY in .env or update in Settings")
@@ -74,7 +74,7 @@ def main():
             # Check if any process has died
             for name, process in processes:
                 if process.poll() is not None:
-                    print(f"\n❌ {name} has stopped!")
+                    print(f"\n[ERROR] {name} has stopped!")
                     print("Shutting down application...")
                     sys.exit(1)
     
@@ -87,10 +87,10 @@ def main():
                 process.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 process.kill()
-        print("✅ Application stopped")
+        print("[OK] Application stopped")
     
     except Exception as e:
-        print(f"\n❌ Error: {e}")
+        print(f"\n[ERROR] Error: {e}")
         for name, process in processes:
             if process.poll() is None:
                 process.kill()

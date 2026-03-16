@@ -1,34 +1,45 @@
 import os
+import google.generativeai as genai
 from dotenv import load_dotenv
-from google import genai # <--- The NEW library
+from typing import Any
 
-# 1. Load environment variables
-load_dotenv()
+# --- Pylance Pacifier ---
+# This stops VS Code from complaining about "configure", "list_models", etc.
+genai_client: Any = genai 
 
-# 2. Get the key
-key = os.getenv("GEMINI_API_KEY")
+def check_gemini_setup():
+    load_dotenv()
+    api_key = os.environ.get("GEMINI_API_KEY")
+    
+    if not api_key:
+        print("❌ Error: GEMINI_API_KEY not found in .env file.")
+        return
 
-print(f"\n🔍 DEBUG INFO:")
-print(f"✅ Key Found: {key[:5]}...{key[-5:]}" if key else "❌ Key Missing")
+    # Use genai_client to satisfy Pylance (Line 17)
+    genai_client.configure(api_key=api_key)
+    
+    print("✅ API Key configured.")
+    print("🔍 Checking available models...")
 
-if key:
     try:
-        # 3. Initialize the New Client
-        client = genai.Client(api_key=key)
+        # Use genai_client to satisfy Pylance (Line 22)
+        models = genai_client.list_models()
+        available_models = [m.name for m in models if 'generateContent' in m.supported_generation_methods]
         
-        print("⏳ Contacting Google API (using google-genai)...")
-        
-        # 4. Generate Content (The new syntax)
-        response = client.models.generate_content(
-            model="gemini-1.5-flash", 
-            contents="Say 'Hello' if this works."
-        )
-        
-        print(f"✅ Response: {response.text}")
-        print("🎉 SUCCESS! The key and library are working.")
-        
+        if available_models:
+            print(f"✅ Connection successful! Found {len(available_models)} generative models.")
+            print(f"📋 Primary model: {available_models[0]}")
+            
+            # Use genai_client to satisfy Pylance (Line 39)
+            test_model = genai_client.GenerativeModel('gemini-1.5-flash')
+            print("🧪 Testing a simple generation...")
+            response = test_model.generate_content("Say 'System Ready'")
+            print(f"🤖 AI Response: {response.text.strip()}")
+        else:
+            print("❌ No generative models found. Check your API permissions.")
+            
     except Exception as e:
-        print(f"❌ Error: {e}")
-        print("   -> If this is a 404, check if 'gemini-1.5-flash' is available in your region.")
-else:
-    print("❌ ERROR: GEMINI_API_KEY not found in .env")
+        print(f"❌ Connection failed: {str(e)}")
+
+if __name__ == "__main__":
+    check_gemini_setup()

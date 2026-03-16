@@ -1,16 +1,17 @@
 
 # stt/stt_live.py
 import sounddevice as sd
-import requests
 import time
 import wave
 import numpy as np
 import asyncio
 import os
 import librosa
+import assemblyai as aai
 from dotenv import load_dotenv
+
 load_dotenv()
-API_KEY = os.environ.get("ASSEMBLYAI_API_KEY", "4bedc386183f491b9d12365c4d91e1a3")
+aai.settings.api_key = os.environ.get("ASSEMBLYAI_API_KEY")
 
 stop_stream = False
 
@@ -38,64 +39,66 @@ def extract_pitch(filename):
     Extract pitch (fundamental frequency) from audio file using librosa
     Returns average pitch in Hz or None if pitch not found
     """
-    y, sr = librosa.load(filename, sr=16000)
-    pitches, magnitudes = librosa.piptrack(y=y, sr=sr)
-    pitch_values = []
+    try:
+        y, sr = librosa.load(filename, sr=16000)
+        pitches, magnitudes = librosa.piptrack(y=y, sr=sr)
+        pitch_values = []
 
-    for i in range(pitches.shape[1]):
-        index = magnitudes[:, i].argmax()
-        pitch = pitches[index, i]
-        if pitch > 0:
-            pitch_values.append(pitch)
+        for i in range(pitches.shape[1]):
+            index = magnitudes[:, i].argmax()
+            pitch = pitches[index, i]
+            if pitch > 0:
+                pitch_values.append(pitch)
 
-    if pitch_values:
-        avg_pitch = float(np.mean(pitch_values))
-        return avg_pitch
-    else:
+        if pitch_values:
+            avg_pitch = float(np.mean(pitch_values))
+            return avg_pitch
+        else:
+            return None
+    except Exception as e:
+        print(f"Pitch extraction error: {e}")
         return None
 
 def transcribe_audio(filename):
     """
-    Upload audio to AssemblyAI and get transcript
+    Upload audio to AssemblyAI and get transcript using SDK with multi-language support
     """
     try:
-        headers = {"authorization": API_KEY}
-        with open(filename, 'rb') as f:
-            response = requests.post("https://api.assemblyai.com/v2/upload", headers=headers, data=f)
-            response.raise_for_status()
-            upload_url = response.json()["upload_url"]
-
-        transcript_request = {
-            "audio_url": upload_url
-        }
-        response = requests.post("https://api.assemblyai.com/v2/transcript", json=transcript_request, headers=headers)
-        response.raise_for_status()
-        transcript_id = response.json()["id"]
-
-        while True:
-            response = requests.get(f"https://api.assemblyai.com/v2/transcript/{transcript_id}", headers=headers)
-            response.raise_for_status()
-            data = response.json()
-            if data["status"] == "completed":
-                return data["text"]
-            elif data["status"] == "error":
-                raise Exception(data.get("error", "Transcription failed"))
-            time.sleep(1)
-    except requests.RequestException as e:
-        raise Exception(f"Network error during transcription: {str(e)}")
-    except KeyError as e:
-        raise Exception(f"Unexpected response format: {str(e)}")
+        # Configure transcription with language detection
+        # This supports Hindi, English, and Hinglish (mixed)
+        config = aai.TranscriptionConfig(
+            language_detection=True
+        )
+        
+        transcriber = aai.Transcriber()
+        transcript = transcriber.transcribe(filename, config=config)
+        
+        if transcript.status == aai.TranscriptStatus.error:
+            raise Exception(f"Transcription failed: {transcript.error}")
+            
+        return transcript.text
+        
+    except Exception as e:
+        print(f"Error during transcription: {str(e)}")
+        raise e
 
 async def start_stt(handle_text):
     global stop_stream
     while not stop_stream:
-        audio = record_audio(5)
-        save_wav(audio, "temp.wav")
-        pitch = extract_pitch("temp.wav")
-        text = transcribe_audio("temp.wav")
-        if text:
-            handle_text(text, pitch)
+        try:
+            audio = record_audio(5)
+            save_wav(audio, "temp.wav")
+            pitch = extract_pitch("temp.wav")
+            text = transcribe_audio("temp.wav")
+            if text:
+                handle_text(text, pitch)
+        except Exception as e:
+            print(f"STT Loop error: {e}")
         await asyncio.sleep(1)
+    
     # Clean up temp file
     if os.path.exists("temp.wav"):
-        os.remove("temp.wav")
+        try:
+            os.remove("temp.wav")
+        except:
+            pass
