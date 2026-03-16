@@ -124,7 +124,8 @@ class EmotionClassifier:
             return {"emotion_label": "neutral", "confidence_score": 0.30,
                     "all_scores": {"neutral": 0.30}}
 
-        dominant = max(scores, key=scores.get)
+        # PYLANCE FIX: Added lambda to ensure safe float comparison
+        dominant = max(scores, key=lambda k: scores.get(k, 0.0))
         confidence = min(scores[dominant] + 0.28, 1.0)
         return {
             "emotion_label": dominant,
@@ -208,7 +209,8 @@ class StressorThemeExtractor:
 
     def dominant_theme(self, texts: List[str]) -> Optional[str]:
         freq = self.theme_frequency(texts)
-        return max(freq, key=freq.get) if freq else None
+        # PYLANCE FIX: Added lambda to ensure safe int comparison
+        return max(freq, key=lambda k: freq.get(k, 0)) if freq else None
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -702,7 +704,8 @@ class TherapyAnalyticsEngine:
 
     def dominant_stressor(self, sessions: List[Dict]) -> str:
         freq = self.topic_frequency(sessions)
-        return max(freq, key=freq.get) if freq else "general_stress"
+        # PYLANCE FIX: Added lambda to ensure safe int comparison
+        return max(freq, key=lambda k: freq.get(k, 0)) if freq else "general_stress"
 
     def categorize_session(self, emotion: str, confidence: float) -> str:
         if emotion in {"anxiety","depression","trauma"} and confidence > 0.50:

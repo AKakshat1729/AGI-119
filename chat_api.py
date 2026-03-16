@@ -1,20 +1,20 @@
 """
-FastAPI service for handling chat responses (Groq only)
+FastAPI service for handling chat responses (Updated to Gemini)
 """
-from fastapi import FastAPI, HTTPException, Header
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import Optional, List, Dict
 import uvicorn
 import logging
-from utils.groq_client import generate_groq_response, validate_groq_token
+from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import Optional, List, Dict, Any
+from utils.llm_client import generate_chat_response, validate_gemini_api_key
 
 # Setup logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Create FastAPI app
-app = FastAPI(title="AGI-119 Chat API", version="1.0.0")
+app = FastAPI(title="AGI-119 Chat API (Gemini Powered)", version="1.1.0")
 
 # Add CORS middleware
 app.add_middleware(
@@ -25,151 +25,119 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# Pydantic models
+# --- Pydantic models ---
 class Message(BaseModel):
-    role: str  # "user" or "assistant"
+    role: str  # "user" or "model" (Gemini uses 'model' instead of 'assistant')
     content: str
-
 
 class ChatRequest(BaseModel):
     messages: List[Message]
     temperature: float = 0.7
-    max_tokens: int = 500
-    api_key: Optional[str] = None  # Allow passing custom API key
-
+    max_tokens: int = 1000
+    api_key: Optional[str] = None
 
 class ChatResponse(BaseModel):
     status: str  # "success" or "error"
     response: Optional[str] = None
     error: Optional[str] = None
-    error_type: Optional[str] = None
     tokens_used: int = 0
-
 
 class APIKeyValidation(BaseModel):
     api_key: str
-
 
 class APIKeyValidationResponse(BaseModel):
     valid: bool
     message: str
     error: Optional[str] = None
 
+# --- Endpoints ---
 
 @app.post("/chat", response_model=ChatResponse)
 async def chat(request: ChatRequest) -> ChatResponse:
-    """
-    Handle chat requests
-    
-    Args:
-        request: ChatRequest containing messages and optional API key
-        
-    Returns:
-        ChatResponse with generated response or error
-    """
+    """Handle chat requests using Gemini"""
     try:
-        # Convert Pydantic models to dicts
-        messages = [{"role": m.role, "content": m.content} for m in request.messages]
+        # Gemini wrapper expects list of dicts: [{"role": "user", "content": "..."}]
+        # We normalize 'assistant' to 'model' for Gemini compatibility
+        messages = []
+        for m in request.messages:
+            role = "model" if m.role in ["assistant", "bot", "model"] else "user"
+            messages.append({"role": role, "content": m.content})
         
-        logger.info(f"Processing chat request with {len(messages)} messages")
+        logger.info(f"Processing chat request for Gemini with {len(messages)} messages")
         
-        # Generate response via Groq client
-        result = generate_groq_response(
+        # Use the stable Gemini client we fixed earlier
+        result = generate_chat_response(
             messages=messages,
             api_key=request.api_key,
-            temperature=request.temperature,
             max_tokens=request.max_tokens
         )
         
-        return ChatResponse(**result)
+        # Mapping result to ChatResponse model
+        return ChatResponse(
+            status=str(result.get("status", "success")),
+            response=str(result.get("response", "")),
+            error=result.get("error"),
+            tokens_used=int(result.get("tokens_used", 0))
+        )
     
     except Exception as e:
         logger.error(f"Error in chat endpoint: {str(e)}")
         return ChatResponse(
             status="error",
             response=None,
-            error=f"An error occurred: {str(e)}",
-            error_type="UNKNOWN_ERROR",
+            error=f"System Error: {str(e)}",
             tokens_used=0
         )
 
-
 @app.post("/validate-api-key", response_model=APIKeyValidationResponse)
-async def validate_api_key(request: APIKeyValidation) -> APIKeyValidationResponse:
-    """
-    Validate an LLM API key (Groq/HF compatible)
-    
-    Args:
-        request: API key to validate
-        
-    Returns:
-        Validation result
-    """
+async def validate_api_key_endpoint(request: APIKeyValidation) -> APIKeyValidationResponse:
+    """Validate a Gemini API key"""
     try:
-        result = validate_groq_token(request.api_key)
-        return APIKeyValidationResponse(**result)
-    
+        result = validate_gemini_api_key(request.api_key)
+        return APIKeyValidationResponse(
+            valid=bool(result.get("valid")),
+            message=str(result.get("message", "Validation complete")),
+            error=result.get("error")
+        )
     except Exception as e:
         logger.error(f"Error validating API key: {str(e)}")
         return APIKeyValidationResponse(
             valid=False,
-            message="Validation error",
-            error="VALIDATION_ERROR"
+            message="Validation engine error",
+            error="SYSTEM_ERROR"
         )
-
 
 @app.get("/health")
 async def health_check():
     """Health check endpoint"""
     return {
         "status": "healthy",
-        "service": "AGI-119 Chat API",
-        "version": "1.0.0"
+        "engine": "Gemini-1.5-Flash",
+        "service": "AGI-119 Chat API"
     }
-
 
 @app.post("/chat-simple")
 async def chat_simple(
     prompt: str,
     api_key: Optional[str] = None,
-    temperature: float = 0.7,
-    max_tokens: int = 500
+    max_tokens: int = 1000
 ):
-    """
-    Simplified chat endpoint for single prompt requests
-    
-    Args:
-        prompt: Single message from user
-        api_key: Optional custom API key
-        temperature: Creativity level
-        max_tokens: Max response tokens
-        
-    Returns:
-        Chat response
-    """
+    """Simplified chat endpoint for single prompt requests"""
     try:
         messages = [{"role": "user", "content": prompt}]
         
-        result = generate_groq_response(
+        result = generate_chat_response(
             messages=messages,
             api_key=api_key,
-            temperature=temperature,
             max_tokens=max_tokens
         )
         
-        return ChatResponse(**result)
+        return result
     
     except Exception as e:
         logger.error(f"Error in simple chat endpoint: {str(e)}")
-        return ChatResponse(
-            status="error",
-            response=None,
-            error=str(e),
-            error_type="UNKNOWN_ERROR",
-            tokens_used=0
-        )
-
+        return {"status": "error", "error": str(e)}
 
 if __name__ == "__main__":
+    # Note: Using port 8000 as per your original configuration
     uvicorn.run(app, host="0.0.0.0", port=8000)

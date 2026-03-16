@@ -1,17 +1,21 @@
+import os
+import json
+import re
+from typing import Any, Dict, List, Optional
+from dotenv import load_dotenv
+import nltk 
 from textblob import TextBlob
 from nltk.sentiment.vader import SentimentIntensityAnalyzer
-import nltk 
-import re
-import json
-from google.generativeai import GenerativeModel
 import google.generativeai as genai
-import os
-from dotenv import load_dotenv
+
+# --- Pylance Pacifier ---
+# Forces Pylance to stop complaining about "configure" or "GenerativeModel" exports
+genai_client: Any = genai
 
 # Initialize VADER
 sia = SentimentIntensityAnalyzer()
 
-def has_non_ascii(text):
+def has_non_ascii(text: str) -> bool:
     """Detect characters outside the standard ASCII range (e.g., Devanagari)."""
     return bool(re.search(r'[^\x00-\x7F]', text))
 
@@ -21,12 +25,15 @@ def llm_sentiment_analyzer(text: str) -> dict:
     """
     try:
         load_dotenv()
-        api_key = os.environ.get("GEMINI_API_KEY")
+        # Use str fallback to ensure type safety
+        api_key = str(os.environ.get("GEMINI_API_KEY") or "")
         if not api_key:
             return {}
             
-        genai.configure(api_key=api_key)
-        model = GenerativeModel("gemini-2.0-flash")
+        genai_client.configure(api_key=api_key)
+        
+        # Switched to 1.5-flash for better stability and demo quota
+        model = genai_client.GenerativeModel("gemini-1.5-flash")
         
         prompt = f"""Analyze the sentiment of this text (could be English, Hindi, or Hinglish).
         Return ONLY a JSON object with:
@@ -41,15 +48,15 @@ def llm_sentiment_analyzer(text: str) -> dict:
         
         response = model.generate_content(prompt)
         # Clean response text if it has markdown formatting
-        clean_json = response.text.replace("```json", "").replace("```", "").strip()
+        raw_text = response.text
+        clean_json = raw_text.replace("```json", "").replace("```", "").strip()
         return json.loads(clean_json)
     except Exception as e:
         print(f"[SENTIMENT FALLBACK ERROR] {e}")
         return {}
 
-# Expanded emotion lexicon for keyword-based detection including negations and dislike-related words
-
-emotion_lexicon = {
+# Expanded emotion lexicon
+emotion_lexicon: Dict[str, List[str]] = {
     "happy": [
         "happy", "joy", "joyful", "excited", "delighted", "pleased", "cheerful", "glad", "love", "like", "enjoy",
         "content", "satisfied", "thrilled", "blissful", "grateful", "ecstatic", "optimistic", "hopeful", "proud",
@@ -88,135 +95,82 @@ emotion_lexicon = {
     ]
 }
 
-
 question_words = ["who", "what", "when", "where", "why", "how", "is", "are", "do", "does", "did", "can", "could", "will", "would", "should"]
 
 def detect_emotions(text: str) -> list:
-    """
-    Detect emotions based on keyword matching, negation handling, and polarity score.
-    More sensitive to negative and positive emotions using polarity thresholds.
-    """
     tokens = nltk.word_tokenize(text.lower())
     detected = set()
-
-    # Simple negation words
     negations = {"not", "no", "never", "n't", "dont", "don't", "didn't", "doesn't", "isn't", "wasn't", "aren't", "cannot"}
 
-    # Keyword-based detection with negation handling
     for emotion, keywords in emotion_lexicon.items():
         for word in keywords:
             if word in tokens:
-                # Check for negation within 3 words before the keyword
                 word_index = tokens.index(word)
                 window_start = max(0, word_index - 3)
                 window = tokens[window_start:word_index]
                 if any(neg in window for neg in negations):
-                    # If negation found, invert emotion if applicable
-                    if emotion == "happy":
-                        detected.add("sad")
-                    elif emotion == "sad":
-                        detected.add("happy")
-                    else:
-                        detected.add(emotion)
+                    if emotion == "happy": detected.add("sad")
+                    elif emotion == "sad": detected.add("happy")
+                    else: detected.add(emotion)
                 else:
                     detected.add(emotion)
 
-    # Polarity-based detection enhancement
     blob = TextBlob(text)
-    sentiment = blob.sentiment
-    polarity = sentiment.polarity  # type: ignore
+    polarity = float(blob.sentiment.polarity) # type: ignore
 
-    # If no keywords detected, use polarity to infer emotion
     if not detected:
-        if polarity > 0.2:
-            detected.add("happy")
-        elif polarity < -0.2:
-            detected.add("sad")
-        else:
-            detected.add("neutral")
+        if polarity > 0.2: detected.add("happy")
+        elif polarity < -0.2: detected.add("sad")
+        else: detected.add("neutral")
     else:
-        # If keywords detected but polarity is strongly negative or positive, add corresponding emotion
-        if polarity > 0.5:
-            detected.add("happy")
-        elif polarity < -0.5:
-            detected.add("sad")
+        if polarity > 0.5: detected.add("happy")
+        elif polarity < -0.5: detected.add("sad")
 
     return list(detected) if detected else ["neutral"]
 
 def is_questioning(text: str) -> bool:
-    """
-    Detect if the text is a question.
-    """
-    if '?' in text:
-        return True
+    if '?' in text: return True
     tokens = nltk.word_tokenize(text.lower())
     return any(word in tokens for word in question_words)
 
-def analyze_tone(text: str, pitch: float | None  = None) -> dict:
-    """
-    Enhanced tone & sentiment analysis for therapeutic context.
-    Accepts optional pitch (Hz) to enhance tone sensitivity.
-    """
+def analyze_tone(text: str, pitch: Optional[float] = None) -> dict:
     blob = TextBlob(text)
     sentiment = blob.sentiment
-    polarity = sentiment.polarity  # type: ignore
-    subjectivity = sentiment.subjectivity  # type: ignore
+    polarity = float(sentiment.polarity) # type: ignore
+    subjectivity = float(sentiment.subjectivity) # type: ignore
 
-    # VADER compound score
     vader_scores = sia.polarity_scores(text)
     compound = vader_scores['compound']
-
-    # Detect emotions
     emotions = detect_emotions(text)
-
-    # Questioning detection
     questioning = is_questioning(text)
 
-    # Check for non-English content or suspiciously neutral scores
     if has_non_ascii(text) or (polarity == 0 and len(text.split()) > 3):
         llm_data = llm_sentiment_analyzer(text)
         if llm_data:
-            polarity = llm_data.get("polarity", polarity)
-            emotions = list(set(emotions + llm_data.get("emotions", [])))
-            overall_mood = llm_data.get("overall_mood", "neutral")
-            # If LLM gave data, we prefer it for non-English
             return {
                 "sentiment": {
-                    "polarity": polarity,
+                    "polarity": llm_data.get("polarity", polarity),
                     "subjectivity": subjectivity,
                     "compound_score": vader_scores['compound']
                 },
-                "emotions": emotions,
-                "overall_mood": overall_mood,
+                "emotions": list(set(emotions + llm_data.get("emotions", []))),
+                "overall_mood": llm_data.get("overall_mood", "neutral"),
                 "is_questioning": questioning,
                 "pitch": pitch,
                 "multilingual": True
             }
 
-    # Overall mood based on polarity
-    if polarity > 0.1:
-        overall_mood = "positive"
-    elif polarity < -0.1:
-        overall_mood = "negative"
-    else:
-        overall_mood = "neutral"
+    overall_mood = "neutral"
+    if polarity > 0.1: overall_mood = "positive"
+    elif polarity < -0.1: overall_mood = "negative"
 
-    # Enhance mood and emotions based on pitch if provided
     if pitch is not None:
-        # Define pitch thresholds (Hz) for low and high pitch - these can be tuned
-        low_pitch_threshold = 100.0
-        high_pitch_threshold = 200.0
-
-        if pitch < low_pitch_threshold:
-            # Low pitch may indicate sadness or calmness
+        if pitch < 100.0:
             overall_mood = "negative"
-            if "sad" not in emotions:
-                emotions.append("sad")
-        elif pitch > high_pitch_threshold:
-            # High pitch may indicate excitement or happiness
+            if "sad" not in emotions: emotions.append("sad")
+        elif pitch > 200.0:
             overall_mood = "positive"
-            if "happy" not in emotions:
-                emotions.append("happy")
+            if "happy" not in emotions: emotions.append("happy")
 
     return {
         "sentiment": {

@@ -163,6 +163,14 @@
                         </div>
                     </div>
                 </div>
+
+                <div class="setting-group" style="margin-top: 20px;">
+                    <label>Change Password</label>
+                    <input type="password" id="old-password" class="setting-input" placeholder="Current Password" style="margin-bottom: 10px;">
+                    <input type="password" id="new-password" class="setting-input" placeholder="New Password" style="margin-bottom: 10px;">
+                    <button class="save-btn" onclick="changePassword()">Update Password</button>
+                    <div id="password-msg" style="margin-top: 8px; font-size: 0.85rem;"></div>
+                </div>
             </div>
 
             <!-- API Tab -->
@@ -505,6 +513,43 @@
             }
         }
 
+        async function changePassword() {
+            const oldPassword = document.getElementById('old-password').value;
+            const newPassword = document.getElementById('new-password').value;
+            const msgEl = document.getElementById('password-msg');
+            
+            if (!oldPassword || !newPassword) {
+                msgEl.style.color = '#ef4444';
+                msgEl.textContent = 'Please fill both fields.';
+                return;
+            }
+            
+            try {
+                msgEl.style.color = 'var(--text-secondary)';
+                msgEl.textContent = 'Updating...';
+                
+                const res = await fetch('/change_password', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({ old_password: oldPassword, new_password: newPassword })
+                });
+                const data = await res.json();
+                
+                if (res.ok) {
+                    msgEl.style.color = '#10b981';
+                    msgEl.textContent = 'Password changed successfully.';
+                    document.getElementById('old-password').value = '';
+                    document.getElementById('new-password').value = '';
+                } else {
+                    msgEl.style.color = '#ef4444';
+                    msgEl.textContent = data.error || 'Failed to change password.';
+                }
+            } catch (e) {
+                msgEl.style.color = '#ef4444';
+                msgEl.textContent = 'Network error occurred.';
+            }
+        }
+
         async function loadInsightsGraph() {
             try {
                 const res = await fetch('/api/analytics/health');
@@ -659,6 +704,7 @@
                     conversationId = data.conversation_id;
                     updateDashboard(data.analysis);
                     loadHistory(); // Refresh sidebar history
+                    setTimeout(() => loadReport(), 800); // Reload the dashboard report with new emotion info
                 } else if (data.error) {
                     addMessage("System Alert: " + data.error, 'bot');
                 }
@@ -799,6 +845,7 @@
                     conversationId = data.conversation_id;
                     updateDashboard(data.analysis);
                     loadHistory();
+                    setTimeout(() => loadReport(), 800);
                 }
                 
                 setTimeout(() => setOrbState('listening'), 2000);

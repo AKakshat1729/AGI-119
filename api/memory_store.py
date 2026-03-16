@@ -2,8 +2,13 @@ import chromadb
 import uuid
 import json
 import os
+import hashlib
 from datetime import datetime, timedelta
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
+import google.generativeai as genai
+
+# --- Pylance Pacifier ---
+genai_client: Any = genai
 
 class ServerMemoryStore:
     def __init__(self, persistence_path="long_term_memory_db"):
@@ -47,7 +52,7 @@ class ServerMemoryStore:
         
         # Check environment for OpenAI availability
         try:
-            import openai
+            import openai # type: ignore
             self.openai_available = True
         except ImportError:
             self.openai_available = False
@@ -82,13 +87,12 @@ class ServerMemoryStore:
         # 1. Try GEMINI
         if self.active_provider == "gemini":
             try:
-                import google.generativeai as genai
                 api_key = os.environ.get("GEMINI_API_KEY")
                 if not api_key:
                     raise ValueError("Missing GEMINI_API_KEY")
                 
-                genai.configure(api_key=api_key)
-                result = genai.embed_content(
+                genai_client.configure(api_key=api_key)
+                result = genai_client.embed_content(
                     model=self.providers["gemini"]["model"],
                     content=text,
                     task_type="retrieval_document",
@@ -120,7 +124,7 @@ class ServerMemoryStore:
         # 2. Try OPENAI
         if self.active_provider == "openai":
             try:
-                import openai
+                import openai # type: ignore
                 # Ensure key is set
                 if not os.environ.get("OPENAI_API_KEY"):
                     print("[MEMORY] No OpenAI Key found, falling back to Hash")
@@ -146,7 +150,6 @@ class ServerMemoryStore:
 
         # 3. Fallback HASH
         # Default/Last Resort
-        import hashlib
         hash_obj = hashlib.md5(text.encode())
         hash_int = int(hash_obj.hexdigest(), 16)
         embedding = []
@@ -163,7 +166,7 @@ class ServerMemoryStore:
             }
         }
 
-    def store_memory(self, user_id: str, memory_type: str, text: str, tags: List[str] = None, importance: float = 1.0, conversation_id: str = None) -> str:
+    def store_memory(self, user_id: str, memory_type: str, text: str, tags: Optional[List[str]] = None, importance: float = 1.0, conversation_id: Optional[str] = None) -> str:
         memory_id = str(uuid.uuid4())
         timestamp = datetime.now().isoformat()
         
@@ -172,15 +175,14 @@ class ServerMemoryStore:
         embedding = embed_result["vector"]
         provider_meta = embed_result["metadata"]
         
-        # Base Metadata
+        # Base Metadata - Cleaned up for ChromaDB strict types
         metadata = {
             "user_id": user_id,
             "type": memory_type,
             "tags": json.dumps(tags or []),
             "timestamp": timestamp,
-            "importance": importance,
-            "conversation_id": conversation_id, # Allow for all types
-            # Add Provider Metadata for tracking
+            "importance": float(importance),
+            "conversation_id": str(conversation_id or "none"), # ChromaDB will crash if this is None
             "embed_provider": provider_meta["provider"],
             "embed_model": provider_meta["model"],
             "embed_dim": provider_meta["dimension"]
@@ -201,10 +203,10 @@ class ServerMemoryStore:
             
         return memory_id
 
-    def retrieve_memories(self, user_id: str, query: str = "", memory_type: str = "episodic", tags: List[str] = None, top_k: int = 5, recency_days: int = None, filter_tags: List[str] = None) -> List[Dict[str, Any]]:
+    def retrieve_memories(self, user_id: str, query: str = "", memory_type: str = "episodic", tags: Optional[List[str]] = None, top_k: int = 5, recency_days: Optional[int] = None, filter_tags: Optional[List[str]] = None) -> List[Dict[str, Any]]:
         try:
             # Construct explicit $and filter for ChromaDB
-            where_conditions = [{"user_id": user_id}]
+            where_conditions: List[Dict[str, Any]] = [{"user_id": user_id}]
             if memory_type:
                 where_conditions.append({"type": memory_type})
             
@@ -231,8 +233,6 @@ class ServerMemoryStore:
                     where=where_filter,
                     limit=top_k
                 )
-                # Format results to match query output structure
-                # .get() returns a dict with 'documents', 'metadatas', 'ids'
             else:
                 # Generate Embedding
                 embed_result = self._generate_embedding(query)
@@ -246,7 +246,6 @@ class ServerMemoryStore:
             
             memories = []
             if results and results.get('documents'):
-                # results['documents'] is List[str] for .get() but List[List[str]] for .query()
                 docs = results['documents']
                 metas = results['metadatas']
                 ids = results['ids']
@@ -267,7 +266,6 @@ class ServerMemoryStore:
                     mem_id = ids[i]
                     dist = distances[i]
                     
-                    # Manual tag filtering if requested (since Chroma doesn't support $contains for JSON-safe strings well)
                     if effective_tags:
                         stored_tags = json.loads(meta.get('tags', '[]'))
                         if not any(tag in stored_tags for tag in effective_tags):
@@ -357,9 +355,6 @@ class ServerMemoryStore:
                     batch_metas = metas[i:i+batch_size]
                     batch_ids = ids[i:i+batch_size]
                     
-                    # Embed batch
-                    # Note: _generate_embedding is single text, need to loop or batch if supported
-                    # Chroma usually handles batch if passed embedding function, but we are manual
                     batch_embeddings = []
                     for doc in batch_docs:
                          res = self._generate_embedding(doc)
@@ -378,15 +373,13 @@ class ServerMemoryStore:
 
     # --- Passthrough/Helper methods ---
     def get_profile(self, user_id: str) -> str:
-        # Try retrieving from active provider
         active_cols = self.collections[self.active_provider]
         results = active_cols["profiles"].query(
             query_texts=["profile"], n_results=1, where={"user_id": user_id}
         )
-        return results['documents'][0] if results['documents'] else ""
+        return results['documents'][0][0] if results['documents'] else ""
 
     def update_profile(self, user_id: str, text: str) -> str:
-        # Delete old profile from ACTIVE provider only 
         active_cols = self.collections[self.active_provider]
         existing = active_cols["profiles"].get(where={"user_id": user_id})
         if existing['ids']:
@@ -395,7 +388,6 @@ class ServerMemoryStore:
 
     def delete_user_data(self, user_id: str) -> bool:
         try:
-            # Delete from ALL providers to be thorough
             for provider in self.collections:
                 cols = self.collections[provider]
                 for key, col in cols.items():
@@ -423,14 +415,12 @@ class ServerMemoryStore:
         """Updates the ultra-concise user life insight"""
         try:
             active_cols = self.collections[self.active_provider]
-            # Delete old core insight
             existing = active_cols["profiles"].get(where={"$and": [{"user_id": user_id}, {"type": "core_insight"}]})
             if existing['ids']:
                 active_cols["profiles"].delete(ids=existing['ids'])
             
-            # Limit to ~20 words just in case (as requested)
             words = insight_text.split()
-            if len(words) > 25: # small buffer
+            if len(words) > 25: 
                 insight_text = " ".join(words[:20]) + "..."
             
             self.store_memory(user_id, "core_insight", insight_text, tags=["profile", "core_insight"])
@@ -441,14 +431,12 @@ class ServerMemoryStore:
         """Deletes all memories associated with a conversation ID across all collections and providers"""
         try:
             count = 0
-            # Common filter for all deletions
             filter_criteria = {"$and": [{"user_id": user_id}, {"conversation_id": conversation_id}]}
             
             for provider in self.collections:
                 cols = self.collections[provider]
                 for col_name, col in cols.items():
                     try:
-                        # Before deleting, count how many for logging
                         results = col.get(where=filter_criteria, include=[])
                         if results and results['ids']:
                             num_to_delete = len(results['ids'])
@@ -472,14 +460,12 @@ class ServerMemoryStore:
         """Retrieves a list of conversation threads — searches ALL provider collections."""
         try:
             threads = {}
-            
-            # Search across every provider's logs collection
             for provider, cols in self.collections.items():
                 logs_col = cols["logs"]
                 try:
                     results = logs_col.get(where={"user_id": user_id}, limit=10000)
                 except Exception:
-                    results = None
+                    continue
                 if not results or not results.get('ids'):
                     continue
                     
@@ -496,7 +482,7 @@ class ServerMemoryStore:
                             "last_message": timestamp,
                             "preview": doc[:100],
                             "message_count": 0,
-                            "title": f"Session {conv_id[:8]}"
+                            "title": f"Session {str(conv_id)[:8]}"
                         }
                     
                     threads[conv_id]["message_count"] += 1
@@ -506,7 +492,6 @@ class ServerMemoryStore:
             
             thread_list = list(threads.values())
             
-            # Generate readable titles from preview text
             for thread in thread_list:
                 if thread["title"].startswith("Session ") and len(thread["title"]) <= 16:
                     words = thread["preview"].replace("User:", "").replace("AI:", "").strip().split()
@@ -542,7 +527,7 @@ class ServerMemoryStore:
                             "timestamp": results['metadatas'][i].get('timestamp'),
                             "id": rid
                         })
-            history.sort(key=lambda x: x.get('timestamp', ''), reverse=True)
+            history.sort(key=lambda x: str(x.get('timestamp', '')), reverse=True)
             return history[:limit]
         except Exception as e:
             print(f"Error getting conversation history: {e}")
@@ -553,7 +538,7 @@ class ServerMemoryStore:
         try:
             messages = []
             seen_ids = set()
-            where_filter = {"$and": [{"user_id": user_id}, {"conversation_id": conversation_id}]}
+            where_filter: Dict[str, Any] = {"$and": [{"user_id": user_id}, {"conversation_id": conversation_id}]}
             for provider, cols in self.collections.items():
                 try:
                     results = cols["logs"].get(where=where_filter)
@@ -565,9 +550,8 @@ class ServerMemoryStore:
                         if rid in seen_ids: continue
                         seen_ids.add(rid)
                         messages.append({"text": doc, "timestamp": results['metadatas'][i].get('timestamp')})
-            messages.sort(key=lambda x: x.get('timestamp', ''))
+            messages.sort(key=lambda x: str(x.get('timestamp', '')))
             return messages
         except Exception as e:
             print(f"Error getting conversation messages: {e}")
             return []
-# REPLACED_MARKER
