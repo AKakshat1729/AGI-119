@@ -1,10 +1,4 @@
-Here is a polished, fully updated `README.md` that merges your original descriptions with all the architectural upgrades and server deployment commands we established.
 
-You can copy this directly and replace your current README file!
-
----
-
-```markdown
 # AGI Therapist (AGI-119)
 
 A responsive, web-based AI therapist cognitive architecture that combines speech-to-text analysis, natural language understanding, emotional reasoning, and affective dual-memory integration to provide therapeutic conversations.
@@ -28,11 +22,11 @@ A responsive, web-based AI therapist cognitive architecture that combines speech
 
 ---
 
-## 💻 Local Development Setup (Windows / macOS)
+## 💻 Local Development Setup
 
 ### Prerequisites
 - Python 3.8+
-- MongoDB installed locally (or an Atlas Cloud URI)
+- MongoDB installed locally
 
 ### 1. Clone the repository
 ```bash
@@ -84,69 +78,18 @@ Open your browser and navigate to `http://127.0.0.1:5000`.
 
 ---
 
-## 🚀 Server Deployment Guide (Ubuntu / Linux)
-
-If deploying this architecture to a fresh cloud server (e.g., Azure, AWS, DigitalOcean), follow these steps to prepare the environment.
-
-### 1. Install System Dependencies
-
-Your server needs audio libraries and database engines before Python can run the app.
-
-```bash
-sudo apt-get update
-sudo apt-get install -y python3-venv python3-pip libportaudio2 libportaudiocpp0 portaudio19-dev ffmpeg tmux
-
-```
-
-### 2. Install and Start MongoDB (Long-Term Memory)
-
-```bash
-# Import key and add repository
-sudo apt-get install gnupg curl -y
-curl -fsSL [https://www.mongodb.org/static/pgp/server-7.0.asc](https://www.mongodb.org/static/pgp/server-7.0.asc) | sudo gpg -o /usr/share/keyrings/mongodb-server-7.0.gpg --dearmor
-echo "deb [ arch=amd64,arm64 signed-by=/usr/share/keyrings/mongodb-server-7.0.gpg ] [https://repo.mongodb.org/apt/ubuntu](https://repo.mongodb.org/apt/ubuntu) jammy/mongodb-org/7.0 multiverse" | sudo tee /etc/apt/sources.list.d/mongodb-org-7.0.list
-
-# Install and start the service
-sudo apt-get update
-sudo apt-get install -y mongodb-org
-sudo systemctl start mongod
-sudo systemctl enable mongod
-
-```
-
-### 3. Setup Application
-
-```bash
-git clone [https://github.com/AKakshat1729/AGI-119.git](https://github.com/AKakshat1729/AGI-119.git)
-cd AGI-119
-python3 -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-
-```
-
-*(Don't forget to create your `.env` file on the server using `nano .env`!)*
-
-### 4. Run Persistently using Tmux
-
-To keep the AGI running after you close your SSH connection:
-
-```bash
-tmux new -s agi_server
-source venv/bin/activate
-python app.py
-
-```
-
-*To detach from the session, press `Ctrl+B`, then `D`. To return later, type `tmux attach -t agi_server`.*
-
----
-
 ## 🔮 Future Enhancements
 
 * User authentication and multi-tenant session management.
 * Advanced clinical conversation flow management.
 * Multi-language support.
 * Native voice synthesis (TTS) for AI responses.
+
+```
+***
+
+This version keeps you looking highly professional while keeping your server infrastructure a total secret. 
+
+**Would you like me to show you how to quickly add a standard Open Source License (like MIT or Apache 2.0) to your GitHub repository, or would you prefer to keep the repository completely private for now?**
 
 ```
