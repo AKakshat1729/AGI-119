@@ -150,10 +150,3 @@ python app.py
 * Native voice synthesis (TTS) for AI responses.
 
 ```
-***
-
-This documentation clearly separates how to run it on a laptop versus how to deploy it to a raw Linux server, which is excellent for a computer science project portfolio.
-
-**Would you like me to help you write a brief technical summary of the "Dual-Memory Architecture" that you can use for the abstract of your research paper?**
-
-```
