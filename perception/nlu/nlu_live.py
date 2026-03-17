@@ -37,7 +37,7 @@ def llm_nlu_fallback(text: str) -> dict:
         genai_client.configure(api_key=api_key)
         
         # Switched to 1.5-flash for better stability and quota management
-        model = genai_client.GenerativeModel("gemini-1.5-flash")
+        model = genai_client.GenerativeModel("gemini-3-flash-preview")
         
         prompt = f"""Perform Natural Language Understanding (NLU) on this text (could be English, Hindi, or Hinglish).
         Extract:

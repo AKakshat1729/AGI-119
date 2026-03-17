@@ -5,19 +5,29 @@ uvicorn
 pydantic
 python-dotenv
 requests
-
+flask-login
+flask-sqlalchemy
+flask-cors
+flask-bcrypt
 # AGI & LLM Core
 google-generativeai
 google-genai
 textblob
 nltk
-
+openai
+sentence-transformers
+pydantic
 # Memory & Reasoning
 chromadb
 sentence-transformers
 pandas
 numpy
-
+pymongo
 # Perception (Speech & Audio)
 assemblyai
 gTTS
+sounddevice
+scipy
+librosa
+numba
+resampy

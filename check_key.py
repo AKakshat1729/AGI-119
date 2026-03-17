@@ -31,7 +31,7 @@ def check_gemini_setup():
             print(f"📋 Primary model: {available_models[0]}")
             
             # Use genai_client to satisfy Pylance (Line 39)
-            test_model = genai_client.GenerativeModel('gemini-1.5-flash')
+            test_model = genai_client.GenerativeModel('gemini-3-flash-preview')
             print("🧪 Testing a simple generation...")
             response = test_model.generate_content("Say 'System Ready'")
             print(f"🤖 AI Response: {response.text.strip()}")

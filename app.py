@@ -6,7 +6,19 @@ import json
 import uuid
 import warnings
 import logging
+import nltk
+import logging
 
+# Auto-download required NLTK data quietly
+try:
+    nltk.data.find('tokenizers/punkt')
+    nltk.data.find('sentiment/vader_lexicon')
+except LookupError:
+    logging.info("Downloading missing NLTK datasets...")
+    nltk.download('punkt', quiet=True)
+    nltk.download('stopwords', quiet=True)
+    nltk.download('vader_lexicon', quiet=True)
+    nltk.download('wordnet', quiet=True)
 # --- Suppress noisy startup warnings ---
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")

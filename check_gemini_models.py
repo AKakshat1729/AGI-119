@@ -19,12 +19,11 @@ load_dotenv()
 # Priority-ordered candidate models — fastest / cheapest first
 # Removed 2.5-flash as it is not a valid model name
 CANDIDATE_MODELS = [
-    "gemini-1.5-flash",
-    "gemini-1.5-flash-8b",
-    "gemini-1.5-pro",
+    "gemini-3-flash-preview",
+    "gemini-3.1-flash-lite-preview",
+    "gemini-2.5-flash",
     "gemini-2.0-flash",
-    "gemini-2.0-flash-lite",
-    "gemini-pro",
+    "gemini-flash-latest"
 ]
 
 ENV_PATH = os.path.join(os.path.dirname(__file__), ".env")

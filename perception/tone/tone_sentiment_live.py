@@ -33,7 +33,7 @@ def llm_sentiment_analyzer(text: str) -> dict:
         genai_client.configure(api_key=api_key)
         
         # Switched to 1.5-flash for better stability and demo quota
-        model = genai_client.GenerativeModel("gemini-1.5-flash")
+        model = genai_client.GenerativeModel("gemini-3-flash-preview")
         
         prompt = f"""Analyze the sentiment of this text (could be English, Hindi, or Hinglish).
         Return ONLY a JSON object with:
