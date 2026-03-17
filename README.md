@@ -86,10 +86,4 @@ Open your browser and navigate to `http://127.0.0.1:5000`.
 * Native voice synthesis (TTS) for AI responses.
 
 ```
-***
 
-This version keeps you looking highly professional while keeping your server infrastructure a total secret. 
-
-**Would you like me to show you how to quickly add a standard Open Source License (like MIT or Apache 2.0) to your GitHub repository, or would you prefer to keep the repository completely private for now?**
-
-```
