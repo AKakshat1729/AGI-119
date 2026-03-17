@@ -148,3 +148,18 @@ static/audio/*.wav
 # Data and Logs
 *.log
 temp_audio_*
+
+# Private keys and environment variables
+.env
+
+# Python artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+
+# Local data (so your local test chats don't get pushed)
+users.json
+*.log
+/data/db/
