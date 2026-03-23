@@ -3,6 +3,8 @@
 
 A responsive, web-based AI therapist cognitive architecture that combines speech-to-text analysis, natural language understanding, emotional reasoning, and affective dual-memory integration to provide therapeutic conversations.
 
+## MVP Link:
+- [Click here](https://share.google/6tVa4QbNrzS1xuYxd)
 ## 🌟 Features
 
 - **Multimodal Input**: Users can type messages or record audio for analysis.
