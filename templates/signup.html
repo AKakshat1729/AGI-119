@@ -167,6 +167,9 @@
                 <label>Neural Link ID (Email)</label>
                 <div class="input-wrapper">
                     <input type="email" name="email" placeholder="user@example.com" required>
+                    <button type="button" onclick="generateGhostEmail()" style="margin-top: 6px; margin-bottom: 10px; background: rgba(16, 185, 129, 0.1); color: #10b981; border: 1px solid #10b981; padding: 6px 10px; border-radius: 4px; font-size: 0.8rem; cursor: pointer; display: inline-flex; align-items: center; gap: 5px; transition: all 0.2s;">
+                    <i class="fa-solid fa-dice"></i> Generate Ghost ID
+                    </button>
                 </div>
             </div>
             
@@ -181,11 +184,39 @@
                 Establish Profile
             </button>
         </form>
+                <div style="margin-top: 20px; padding: 12px; background-color: rgba(16, 185, 129, 0.1); border-left: 4px solid #10b981; border-radius: 6px; text-align: left;">
+                    <p style="margin: 0; font-size: 0.85rem; color: #94a3b8; font-family: sans-serif; line-height: 1.4;">
+                        <i class="fa-solid fa-user-secret" style="color: #10b981; margin-right: 6px;"></i>
+                        <strong>Privacy First:</strong> We understand privacy concerns. For complete anonymity, you can use a made-up email address (e.g., anon123@fake.com).
+                    </p>
+                </div>
 
         <div class="footer-link">
             Already initialized? <a href="{{ url_for('login') }}">Connect</a>
         </div>
     </div>
+    <script>
+    function generateGhostEmail() {
+        const prefixes = ['ghost', 'cipher', 'shadow', 'neon', 'nova', 'echo', 'flux'];
+        const randomPrefix = prefixes[Math.floor(Math.random() * prefixes.length)];
+        const randomNum = Math.floor(1000 + Math.random() * 9000);
+        const ghostEmail = `${randomPrefix}_${randomNum}@anon.local`;
+        
+        // Find the email input field and fill it
+        const emailInput = document.querySelector('input[type="email"], input[name="email"]');
+        if (emailInput) {
+            emailInput.value = ghostEmail;
+            
+            // Give it a quick green flash effect so the user knows it worked
+            const originalBorder = emailInput.style.border;
+            emailInput.style.border = "2px solid #10b981";
+            setTimeout(() => {
+                emailInput.style.border = originalBorder;
+            }, 400);
+        }
+    }
+</script>
 
 </body>
 </html>
+<script>localStorage.clear(); sessionStorage.clear();</script>

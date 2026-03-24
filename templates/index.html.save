@@ -1,12 +1,15 @@
-<!DOCTYPE html>
+qqq<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>AGI-119 | AGITherapist</title>
+    <!-- Fonts -->
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <!-- Custom CSS -->
     <link rel="stylesheet" href="/static/css/style.css?v=5">
+    <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.2/purify.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -14,7 +17,9 @@
 <body>
 
     <div class="app-container">
+        <!-- INSIGHT SIDEBAR -->
         <aside class="sidebar" id="sidebar">
+            <!-- Fixed Header -->
             <div class="sidebar-header">
                 <i class="fa-solid fa-brain" style="color: var(--accent-color)"></i>
                 <span class="brand-title">AGITherapist</span>
@@ -23,12 +28,14 @@
                 </button>
             </div>
 
+            <!-- Scrollable Middle Content -->
             <div class="sidebar-scroll">
                 <button class="sidebar-action" onclick="startNewSession()" style="background: rgba(0, 243, 255, 0.1); border: 1px solid var(--accent-color); color: var(--accent-color); margin-top: 16px;">
                     <i class="fa-solid fa-plus"></i>
                     <span>New Session</span>
                 </button>
 
+                <!-- Mood Tracker -->
                 <div class="section-header">Live Status</div>
                 <div class="stat-card">
                     <div class="stat-label">Reference Tone</div>
@@ -48,17 +55,21 @@
                     <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:0.65rem; margin-left:auto; opacity:0.5;"></i>
                 </a>
 
+                <!-- Memory Snapshot (loads on page load) -->
                 <div class="section-header">Memory Snapshot</div>
                 <div id="memory-snapshot" style="padding: 10px 12px; font-size: 0.82rem; color: var(--text-secondary); background: rgba(0,243,255,0.03); border-radius: 8px; margin-bottom: 8px; min-height: 40px;">
                     Loading...
                 </div>
 
+                <!-- History -->
                 <div class="section-header">Memory Archives</div>
                 <div class="history-list" id="history-list">
+                    <!-- Populated via JS -->
                     <div style="padding: 10px; color: var(--text-secondary); font-size: 0.85rem;">Loading archives...</div>
                 </div>
 
             </div>
+            <!-- Fixed Footer: User Controls -->
             <div class="sidebar-footer">
                 <div class="stat-label">User Profile</div>
                 <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
@@ -78,12 +89,13 @@
             </div>
         </aside>
 
+        <!-- MAIN CHAT AREA -->
         <main class="chat-area">
             <header class="chat-header">
                 <button class="action-btn" onclick="toggleSidebar()">
                     <i class="fa-solid fa-bars"></i>
                 </button>
-
+                
                 <div class="therapist-status">
                     <div class="orb-container">
                         <div class="orb" id="orb"></div>
@@ -100,14 +112,22 @@
             </header>
 
             <div class="messages-wrapper" id="messages-container">
+                <!-- Welcome Message -->
                 <div class="message-row bot">
                     <div class="avatar"><i class="fa-solid fa-robot"></i></div>
                     <div class="message-bubble">
                         I am AGI-119. I'm here to listen, process, and support you. How are you feeling right now?
                     </div>
                 </div>
+        		<div id="typing-indicator" class="typing-indicator">
+        		    <span class="dot"></span>
+        		    <span class="dot"></span>
+        		    <span class="dot"></span>
+        		</div>
+
             </div>
 
+            <!-- INPUT AREA -->
             <div class="input-area">
                 <div class="input-capsule">
                     <button class="action-btn" id="mic-btn" onclick="toggleMic()">
@@ -118,11 +138,11 @@
                         <i class="fa-solid fa-paper-plane"></i>
                     </button>
                 </div>
-                <p style="text-align: center; font-size: 10px; color: #94a3b8; margin: 8px 0 0 0; opacity: 0.7; font-family: sans-serif;">AGI Therapist is an AI. It is not a substitute for a licensed human therapist or professional medical advice.</p>
             </div>
         </main>
     </div>
 
+    <!-- SETTINGS MODAL -->
     <div class="modal-overlay" id="settings-modal" onclick="closeSettings(event)">
         <div class="modal" id="settings-content" onclick="event.stopPropagation()">
             <div class="modal-header">
@@ -130,18 +150,21 @@
                 <button class="close-modal" onclick="closeSettings()"><i class="fa-solid fa-times"></i></button>
             </div>
 
+            <!-- Tabs -->
             <div style="display: flex; gap: 16px; margin-bottom: 24px; border-bottom: 1px solid var(--glass-border);">
                 <button class="tab-btn active" onclick="switchTab('general')">General</button>
                 <button class="tab-btn" onclick="switchTab('api')">API & Model</button>
                 <button class="tab-btn" onclick="switchTab('insights')">Medical Insights</button>
             </div>
 
+            <!-- General Tab -->
             <div id="tab-general" class="tab-content">
                 <div class="setting-group">
                     <label>Interface Theme</label>
                     <div style="display: flex; gap: 12px; align-items: center;">
                         <span style="font-size: 0.9rem; color: var(--text-secondary);">Dark Tech Mode</span>
                         <div style="margin-left: auto;">
+                            <!-- Only dark mode supported for now in this request -->
                              <span style="color: var(--accent-color); font-size: 0.8rem;">Active</span>
                         </div>
                     </div>
@@ -154,36 +177,19 @@
                     <button class="save-btn" onclick="changePassword()">Update Password</button>
                     <div id="password-msg" style="margin-top: 8px; font-size: 0.85rem;"></div>
                 </div>
-
-                <div class="setting-group" style="margin-top: 30px;">
-                    <label style="color: #ef4444;">Danger Zone</label>
-                    <div style="background: rgba(239, 68, 68, 0.05); border: 1px solid rgba(239, 68, 68, 0.2); padding: 15px; border-radius: 8px;">
-                        <p style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 0; margin-bottom: 15px;">
-                            Permanently delete your account and all therapy session history. This action cannot be undone.
-                        </p>
-                        <button class="save-btn" onclick="deleteAccount()" style="background: #ef4444; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                            <i class="fa-solid fa-trash-can"></i> Delete My Account
-                        </button>
-                    </div>
-                </div>
             </div>
 
+            <!-- API Tab -->
             <div id="tab-api" class="tab-content" style="display: none;">
-                <div class="setting-group" style="background: rgba(0, 243, 255, 0.05); border: 1px solid rgba(0, 243, 255, 0.2); padding: 15px; border-radius: 8px;">
-                    <label style="color: var(--accent-color); font-weight: 600; margin-bottom: 8px; display: block;">Gemini API Key</label>
-                    <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px;">
-                        To power the AGI Therapist, you need a Google GenAI key. 
-                        <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--accent-color); text-decoration: none;">
-                            <i class="fa-solid fa-book-open-reader"></i> Get your free key here
-                        </a>
-                    </p>
-                    <div style="display: flex; gap: 10px;">
-                        <input type="password" id="gemini-key" class="setting-input" placeholder="Paste your AI_za... key here" style="flex: 1;">
-                        <button class="save-btn" onclick="saveApiKey()">Save</button>
-                    </div>
+                <div class="setting-group">
+                    <label>Gemini API Key</label>
+                    <input type="password" id="gemini-key" class="setting-input" placeholder="Enter your Gemini API Key">
+                    <button class="save-btn" onclick="saveApiKey()">Update Key</button>
+                    <div style="margin-top: 8px; font-size: 0.8rem; color: var(--text-secondary);">Key is securely stored in your profile settings.</div>
                 </div>
             </div>
 
+            <!-- Insights Tab -->
             <div id="tab-insights" class="tab-content" style="display: none;">
                 <div class="setting-group">
                     <label>Long-Term Condition Analysis</label>
@@ -196,6 +202,7 @@
         </div>
     </div>
 
+    <!-- DASHBOARD MODAL -->
     <div class="modal-overlay" id="dashboard-modal" onclick="closeDashboard(event)">
         <div class="modal" id="dashboard-content" onclick="event.stopPropagation()" style="max-width: 800px;">
             <div class="modal-header">
@@ -228,23 +235,86 @@
     </div>
 
     <style>
-        .chat-container { max-width: 100%; width: 95%; margin: auto; padding: 10px; }
-        .typing-indicator { display: flex !important; position: fixed; bottom: 80px; left: 20px; z-index: 9999; background: #00f3ff !important; color: black; }
-        .typing-indicator .dot { background-color: #00f3ff !important; width: 8px; height: 8px; }
-        .typing-indicator .dot:nth-child(1) { animation-delay: -0.32s; }
-        .typing-indicator .dot:nth-child(2) { animation-delay: -0.16s; }
-        @keyframes typingBlink { 0%, 80%, 100% { transform: scale(0); opacity: 0.4; } 40% { transform: scale(1); opacity: 1; } }
-        .tab-btn { background: none; border: none; color: var(--text-secondary); padding: 8px 16px; cursor: pointer; border-bottom: 2px solid transparent; font-weight: 500; }
-        .tab-btn.active { color: var(--accent-color); border-bottom-color: var(--accent-color); }
-        .history-item { position: relative; padding-right: 40px !important; }
-        .delete-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #ef4444; background: rgba(239, 68, 68, 0.1); border: none; cursor: pointer; opacity: 0; transition: all 0.2s; }
-        .history-item:hover .delete-btn, .timeline-item:hover .delete-btn { opacity: 1; }
-        .delete-btn:hover { background: #ef4444; color: white; }
-    </style>
-    <style>
-        @media (max-width: 768px) { #orb-container, #status-bar { display: none !important; } .chat-area { margin-bottom: 20px; } }
+    		/* Mobile scaling for the chat box */
+    	.chat-container {
+    	    max-width: 100%;
+    	    width: 95%;
+    	    margin: auto;
+    	    padding: 10px;
+    	}
+
+    	/* The Thinking Animation Styles */
+        .typing-indicator {
+            display: flex !important; /* Temporarily change from 'none' to 'flex' */
+            position: fixed; /* Make it float over everything */
+            bottom: 80px;
+            left: 20px;
+            z-index: 9999;
+            background: #00f3ff !important; /* Neon Blue */
+            color: black;
+        }
+        .typing-indicator .dot {
+            background-color: #00f3ff !important; /* Force it to be Neon */
+            width: 8px;
+            height: 8px;
+        }
+
+    	.typing-indicator .dot:nth-child(1) { animation-delay: -0.32s; }
+    	.typing-indicator .dot:nth-child(2) { animation-delay: -0.16s; }
+
+    	@keyframes typingBlink {
+    	    0%, 80%, 100% { transform: scale(0); opacity: 0.4; }
+    	    40% { transform: scale(1); opacity: 1; }
+    	}	
+
+        .tab-btn {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            padding: 8px 16px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-weight: 500;
+        }
+        .tab-btn.active {
+            color: var(--accent-color);
+            border-bottom-color: var(--accent-color);
+        }
+        
+        /* Delete Button Styles */
+        .history-item {
+            position: relative;
+            padding-right: 40px !important;
+        }
+        .delete-btn {
+            position: absolute;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+            border: none;
+            cursor: pointer;
+            opacity: 0;
+            transition: all 0.2s;
+        }
+        .history-item:hover .delete-btn,
+        .timeline-item:hover .delete-btn {
+            opacity: 1;
+        }
+        .delete-btn:hover {
+            background: #ef4444;
+            color: white;
+        }
     </style>
 
+    <!-- JS LOGIC -->
     <script>
         let isRecording = false;
         let mediaRecorder;
@@ -252,19 +322,36 @@
         let conversationId = null;
         let chartInstance = null;
 
+        // --- INIT ---
         window.addEventListener('load', () => {
+             // Mobile check
              if (window.innerWidth < 768) {
                 document.getElementById('sidebar').classList.remove('active');
             } else {
+                // Open by default on desktop for better UX
                  document.getElementById('sidebar').classList.add('active');
             }
+            
             loadSettingsAndTheme();
-            loadHistory(true);
+            loadHistory();
         });
 
+        // --- SIDEBAR & NAVIGATION ---
         function toggleSidebar() {
             const sidebar = document.getElementById('sidebar');
             sidebar.classList.toggle('active');
+            
+            // Adjust chat area margin on desktop
+            /*
+            const chatArea = document.querySelector('.chat-area');
+            if (window.innerWidth > 768) {
+                if (sidebar.classList.contains('active')) {
+                    chatArea.style.marginLeft = '320px';
+                } else {
+                    chatArea.style.marginLeft = '0';
+                }
+            }
+            */
         }
 
         function startNewSession() {
@@ -279,7 +366,7 @@
                 </div>
             `;
             setOrbState('listening');
-            if (window.innerWidth < 768) document.getElementById("sidebar").classList.remove("active");
+            if (window.innerWidth < 768) toggleSidebar();
         }
 
         async function loadHistory() {
@@ -287,23 +374,25 @@
             try {
                 const res = await fetch(`/api/conversation-threads?_=${new Date().getTime()}`);
                 const data = await res.json();
-
+                
                 if (data.threads && data.threads.length > 0) {
+                    // Update mood from most recent thread if available
                     const recent = data.threads[0];
                     if (recent.mood) {
                          const moodDot = document.getElementById('mood-dot');
                          const moodText = document.getElementById('mood-text');
                          moodText.textContent = recent.mood.toUpperCase();
-
-                         let color = '#10b981'; 
+                         
+                         let color = '#10b981'; // green
                          if (recent.mood.includes('sad')) color = '#3b82f6';
                          if (recent.mood.includes('anx')) color = '#f59e0b';
                          if (recent.mood.includes('ang')) color = '#ef4444';
-
+                         
                          moodDot.style.background = color;
                          moodDot.style.boxShadow = `0 0 15px ${color}`;
                     }
 
+                    // --- MEMORY SNAPSHOT: Show recent thread titles in sidebar ---
                     const snapshot = document.getElementById('memory-snapshot');
                     const recent5 = data.threads.slice(0, 5);
                     snapshot.innerHTML = recent5.map(t => {
@@ -332,12 +421,14 @@
                     container.innerHTML = '<div style="padding: 12px; color: var(--text-secondary); font-size: 0.85rem;">No history found.</div>';
                 }
 
+                // Also preload chart, timeline and report in background
                 loadInsightsGraph();
                 loadTimeline();
                 loadReport();
 
+                // Restore last session
                 const lastSessionId = localStorage.getItem('lastConversationId');
-                if (lastSessionId && !conversationId) {
+                if (lastSessionId) {
                     loadConversation(lastSessionId);
                 }
             } catch (e) {
@@ -345,23 +436,23 @@
             }
         }
 
-        async function loadConversation(id, isAutoRefresh = false) {
+        async function loadConversation(id) {
             conversationId = id;
             localStorage.setItem('lastConversationId', id);
             const container = document.getElementById('messages-container');
             container.innerHTML = '<div style="text-align: center; padding: 20px;">Loading memory...</div>';
-
+            
             try {
                 const res = await fetch(`/api/conversation/${id}/messages`);
                 const data = await res.json();
-
+                
                 container.innerHTML = '';
                 if (data.messages) {
                     data.messages.forEach(msg => {
                         addMessage(msg.text, msg.role);
                     });
                 }
-                if (window.innerWidth < 768 && !isAutoRefresh) document.getElementById("sidebar").classList.remove("active");
+                if (window.innerWidth < 768) toggleSidebar();
             } catch (e) {
                 console.error(e);
             }
@@ -378,11 +469,14 @@
                     const data = await res.json();
                     if (data.success) {
                         if (conversationId === id) startNewSession();
-                        loadHistory(true);
+                        
+                        // Refresh all lists
+                        loadHistory();
                         if (document.getElementById('dashboard-modal').classList.contains('open')) {
                             loadTimeline();
                             loadReport();
                         }
+                        // Refresh graph if settings open
                         if (document.getElementById('settings-modal').classList.contains('open')) {
                             loadInsightsGraph();
                         }
@@ -395,41 +489,23 @@
             }
         }
 
+        // --- SETTINGS ---
         function openSettings() {
             document.getElementById('settings-modal').classList.add('open');
             loadInsightsGraph();
         }
 
         function closeSettings(e) {
-            if (e && e.target.id !== 'settings-modal') return; 
+            if (e && e.target.id !== 'settings-modal') return; // Click outside check within onclick="closeSettings(event)"
             document.getElementById('settings-modal').classList.remove('open');
         }
 
         function switchTab(tabId) {
             document.querySelectorAll('.tab-content').forEach(el => el.style.display = 'none');
             document.getElementById('tab-' + tabId).style.display = 'block';
-
+            
             document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
-            event.target.classList.add('active'); 
-        }
-
-        // --- NEW: DELETE ACCOUNT FUNCTION ---
-        async function deleteAccount() {
-            if (confirm("Are you absolutely sure? This will permanently erase your account and all chats.")) {
-                try {
-                    const res = await fetch('/api/account/delete', { method: 'POST' });
-                    if (res.ok) {
-                        localStorage.clear();
-                        sessionStorage.clear();
-                        window.location.href = '/login';
-                    } else {
-                        alert("Failed to delete account. Please try again.");
-                    }
-                } catch (e) {
-                    console.error("Error:", e);
-                    alert("An error occurred while deleting the account.");
-                }
-            }
+            event.target.classList.add('active'); // Assumes called from btn
         }
 
         async function loadSettingsAndTheme() {
@@ -437,15 +513,19 @@
                 const res = await fetch('/api/settings');
                 const data = await res.json();
                 if (data.settings) {
+                    // Apply API key if needed for local UI logic (not really needed here, but kept)
                     if (data.settings.gemini_api_key) {
                         document.getElementById('gemini-key').value = data.settings.gemini_api_key;
                     }
+                    
+                    // Apply Theme
                     if (data.settings.dark_mode) {
                         document.body.classList.add('dark-mode');
                         document.getElementById('darkModeToggle').checked = true;
                     } else {
                         document.body.classList.remove('dark-mode');
                     }
+                    
                     if (data.settings.theme_color) {
                         document.documentElement.style.setProperty('--accent-color', data.settings.theme_color);
                     }
@@ -456,7 +536,7 @@
         async function saveApiKey() {
             const key = document.getElementById('gemini-key').value.trim();
             if (!key) return alert('Please enter a key');
-
+            
             try {
                 const res = await fetch('/api/settings/gemini-key', {
                     method: 'PUT',
@@ -464,7 +544,7 @@
                     body: JSON.stringify({ api_key: key })
                 });
                 const data = await res.json();
-                if (data.success) alert('Success: Key securely updated!');
+                if (data.success) alert('Success: Key Updated');
                 else alert('Error: ' + data.message);
             } catch (e) {
                 alert('Update failed');
@@ -475,24 +555,24 @@
             const oldPassword = document.getElementById('old-password').value;
             const newPassword = document.getElementById('new-password').value;
             const msgEl = document.getElementById('password-msg');
-
+            
             if (!oldPassword || !newPassword) {
                 msgEl.style.color = '#ef4444';
                 msgEl.textContent = 'Please fill both fields.';
                 return;
             }
-
+            
             try {
                 msgEl.style.color = 'var(--text-secondary)';
                 msgEl.textContent = 'Updating...';
-
+                
                 const res = await fetch('/change_password', {
                     method: 'POST',
                     headers: {'Content-Type': 'application/json'},
                     body: JSON.stringify({ old_password: oldPassword, new_password: newPassword })
                 });
                 const data = await res.json();
-
+                
                 if (res.ok) {
                     msgEl.style.color = '#10b981';
                     msgEl.textContent = 'Password changed successfully.';
@@ -512,11 +592,11 @@
             try {
                 const res = await fetch('/api/analytics/health');
                 const data = await res.json();
-
+                
                 if (data.success) {
                     const ctx = document.getElementById('healthChart').getContext('2d');
                     if (chartInstance) chartInstance.destroy();
-
+                    
                     chartInstance = new Chart(ctx, {
                         type: 'radar',
                         data: {
@@ -551,6 +631,7 @@
             } catch (e) { console.error("Graph error", e); }
         }
 
+        // --- DASHBOARD LOGIC ---
         function openDashboard() {
             document.getElementById('dashboard-modal').classList.add('open');
             loadTimeline();
@@ -565,7 +646,8 @@
         function switchDashTab(tabId) {
             document.querySelectorAll('.dash-tab-content').forEach(el => el.style.display = 'none');
             document.getElementById('dash-' + tabId).style.display = 'block';
-
+            
+            // Update active state for buttons (simple toggle for now)
             const btns = document.querySelectorAll('#dashboard-modal .tab-btn');
             btns.forEach(b => b.classList.remove('active'));
             event.target.classList.add('active');
@@ -576,7 +658,7 @@
             try {
                 const res = await fetch(`/api/dashboard/timeline?_=${new Date().getTime()}`);
                 const data = await res.json();
-
+                
                 if (data.success && data.timeline.length > 0) {
                     container.innerHTML = data.timeline.map(t => `
                         <div class="timeline-item" style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; display: flex; gap: 12px; align-items: start; position: relative; margin-bottom: 12px;">
@@ -611,16 +693,16 @@
             try {
                 const res = await fetch('/api/dashboard/report');
                 const data = await res.json();
-
+                
                 if (data.success && data.report) {
-                    const medList = data.report.medical_history.length ?
-                        data.report.medical_history.map(i => `<div style="margin-bottom: 4px;">• ${i}</div>`).join('') :
+                    const medList = data.report.medical_history.length ? 
+                        data.report.medical_history.map(i => `<div style="margin-bottom: 4px;">• ${i}</div>`).join('') : 
                         '<span style="color: var(--text-secondary);">No medical records found.</span>';
-
-                    const persList = data.report.personal_profile.length ?
-                        data.report.personal_profile.map(i => `<div style="margin-bottom: 4px;">• ${i}</div>`).join('') :
+                        
+                    const persList = data.report.personal_profile.length ? 
+                        data.report.personal_profile.map(i => `<div style="margin-bottom: 4px;">• ${i}</div>`).join('') : 
                         '<span style="color: var(--text-secondary);">No personal details found.</span>';
-
+                        
                     document.getElementById('medical-list').innerHTML = medList;
                     document.getElementById('personal-list').innerHTML = persList;
                 }
@@ -629,6 +711,7 @@
             }
         }
 
+        // --- CHAT LOGIC ---
         function autoResize(el) {
             el.style.height = 'auto';
             el.style.height = el.scrollHeight + 'px';
@@ -660,7 +743,7 @@
                 </div>
             `;
             container.appendChild(typingRow);
-            container.lastElementChild.scrollIntoView({ behavior: "smooth", block: "end" });
+            container.scrollTop = container.scrollHeight;
 
             const formData = new FormData();
             formData.append('text', text);
@@ -670,11 +753,14 @@
                 const res = await fetch('/analyze', { method: 'POST', body: formData });
                 const data = await res.json();
 
+                // --- DESTROY THE INDICATOR ---
                 const indicatorToRemove = document.getElementById(typingId);
                 if (indicatorToRemove) indicatorToRemove.remove();
 
                 setOrbState('speaking');
 
+                // --- THE "UNWRAPPER" LOGIC ---
+                // This handles both 'data.response' and 'data.message' just in case
                 let rawContent = data.response || data.message;
                 let finalMessage = "";
 
@@ -692,12 +778,14 @@
                 }
 
                 if (finalMessage) {
-                    addMessage(finalMessage, 'bot');
+                    addMessage(finalMessage, 'bot'); // Displays the actual text
                     conversationId = data.conversation_id;
-
-                    updateDashboard(data);
-                    loadHistory(true);
-                    setTimeout(() => loadReport(), 800);
+                    
+                    // Pass the whole data object to update the Mood Dot/Dashboard
+                    updateDashboard(data); 
+                    
+                    loadHistory(); 
+                    setTimeout(() => loadReport(), 800); 
                 } else if (data.error) {
                     addMessage("System Alert: " + data.error, 'bot');
                 }
@@ -708,24 +796,27 @@
                 console.error("Connection Error:", e);
                 const indicatorToRemove = document.getElementById(typingId);
                 if (indicatorToRemove) indicatorToRemove.remove();
-
+                
                 addMessage("Connection Failure. Please check server.", 'bot');
                 setOrbState('error');
             }
         }
         function addMessage(text, role) {
             const container = document.getElementById('messages-container');
-
+            
+            // 1. Create the element first (This was missing!)
             const row = document.createElement('div');
+            
+            // 2. Now you can give it a class
             row.className = `message-row ${role}`;
-
+            
             const avatar = document.createElement('div');
             avatar.className = 'avatar';
             avatar.innerHTML = role === 'user' ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-robot"></i>';
-
+            
             const bubble = document.createElement('div');
             bubble.className = 'message-bubble';
-
+            
             try {
                 const raw = marked.parse(text);
                 bubble.innerHTML = DOMPurify.sanitize(raw);
@@ -734,27 +825,23 @@
             }
 
             if (role === 'user') {
-                row.appendChild(bubble);
+                row.appendChild(bubble); 
                 row.appendChild(avatar);
             } else {
                 row.appendChild(avatar);
                 row.appendChild(bubble);
             }
 
-            const isNearBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 150;
             container.appendChild(row);
-
-            if (isNearBottom || role === 'user') {
-                row.scrollIntoView({ behavior: 'smooth', block: 'end' });
-            }
+            container.scrollTop = container.scrollHeight;
         }
-
         function setOrbState(state) {
             const orb = document.getElementById('orb');
             const status = document.getElementById('status-text');
-
+             
+            // Remove lingering animations
             orb.style.animation = 'none';
-            orb.offsetHeight; 
+            orb.offsetHeight; /* trigger reflow */
 
             if (state === 'thinking') {
                 orb.style.animation = 'pulse 0.5s infinite alternate';
@@ -776,23 +863,24 @@
 
         function updateDashboard(data) {
             if (!data || !data.sentiment) return;
-
+            
             const moodDot = document.getElementById('mood-dot');
             const moodText = document.getElementById('mood-text');
 
             const mood = data.sentiment.toLowerCase();
             moodText.textContent = mood.toUpperCase();
-
-            let color = '#10b981'; 
-            if (mood.includes('sad') || mood.includes('negative')) color = '#3b82f6'; 
-            if (mood.includes('anx') || mood.includes('stress')) color = '#f59e0b'; 
-            if (mood.includes('ang')) color = '#ef4444'; 
-            if (mood.includes('neu')) color = '#a8c0ff'; 
-
+            
+            let color = '#10b981'; // Default: Green (Positive)
+            if (mood.includes('sad') || mood.includes('negative')) color = '#3b82f6'; // Blue
+            if (mood.includes('anx') || mood.includes('stress')) color = '#f59e0b'; // Orange
+            if (mood.includes('ang')) color = '#ef4444'; // Red
+            if (mood.includes('neu')) color = '#a8c0ff'; // Soft Purple/Blue
+            
             moodDot.style.background = color;
             moodDot.style.boxShadow = `0 0 15px ${color}`;
         }
 
+        // --- AUDIO ---
         async function toggleMic() {
             const btn = document.getElementById('mic-btn');
             if (!isRecording) {
@@ -809,8 +897,8 @@
                     mediaRecorder.start();
                     isRecording = true;
                     btn.style.color = '#ef4444';
-                    btn.classList.add('recording-pulse'); 
-                    setOrbState('thinking');
+                    btn.classList.add('recording-pulse'); // Add css class for pulse
+                    setOrbState('thinking'); 
                 } catch (e) {
                     console.error(e);
                     alert("Microphone access denied. Please allow microphone permissions.");
@@ -830,8 +918,9 @@
             const container = document.getElementById('messages-container');
             const typingId = "temp-voice-indicator";
 
+            // 1. Show the "Processing Voice" bubble immediately
             setOrbState('thinking');
-
+            
             const typingRow = document.createElement('div');
             typingRow.id = typingId;
             typingRow.className = 'message-row bot';
@@ -842,27 +931,27 @@
                 </div>
             `;
             container.appendChild(typingRow);
-            
-            const isNearBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 150;
-            if (isNearBottom) {
-                container.lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'end' });
-            }
+            container.scrollTop = container.scrollHeight;
 
             try {
                 const res = await fetch('/analyze', { method: 'POST', body: formData });
                 const data = await res.json();
 
+                // 2. Remove the indicator once we have the data
                 const indicatorToRemove = document.getElementById(typingId);
                 if (indicatorToRemove) indicatorToRemove.remove();
 
                 setOrbState('speaking');
 
+                // Show what the user said (Transcript)
                 if (data.transcript) addMessage("🎙️ " + data.transcript, 'user');
 
+                // Show what the AGI says
                 if (data.response) {
                     addMessage(data.message, 'bot');
                     conversationId = data.conversation_id;
                     updateDashboard(data);
+                    loadHistory();
                     setTimeout(() => loadReport(), 800);
                 }
 
@@ -870,13 +959,15 @@
 
             } catch (e) {
                 console.error("Audio Process Error:", e);
+                
+                // Cleanup on error
                 const indicatorToRemove = document.getElementById(typingId);
                 if (indicatorToRemove) indicatorToRemove.remove();
-
+                
                 setOrbState('error');
                 addMessage("Voice processing failed. Please try again.", 'bot');
             }
-        }
+        }        
         document.getElementById('user-input').addEventListener('keypress', function (e) {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
