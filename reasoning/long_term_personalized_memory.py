@@ -14,18 +14,24 @@ except ImportError:
     MedicalProfileExtractor = None
 
 class PersonalizedMemoryModule:
-    def __init__(self, db_path="personalized_memory.db", vector_path="personalized_vector_db"):
+    # 1. Update the signature to accept 'database=None'
+    def __init__(self, db_path="personalized_memory.db", vector_path="personalized_vector_db", database=None):
         self.db_path = db_path
         self.vector_path = vector_path
         
-        # Initialize SQLite for structured data
+        # Link to MongoDB Atlas (The Cloud Brain)
+        self.db = database
+        if self.db is not None:
+            print("[PERSONALIZED MEMORY] Cloud connection synchronized.")
+        
+        # Initialize local SQLite
         self._init_sqlite()
         
         # Initialize ChromaDB for vector data
-        # Using the specified local embedding model
         try:
             from chromadb.utils import embedding_functions
-            # Cast to Any to prevent Pylance "Contravariance" errors
+            from typing import Any, cast 
+            
             raw_emb_fn = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
             self.emb_fn = cast(Any, raw_emb_fn)
         except Exception as e:
@@ -33,6 +39,8 @@ class PersonalizedMemoryModule:
             self.emb_fn = None
 
         self.chroma_client = chromadb.PersistentClient(path=self.vector_path)
+        
+        # Re-initialize collection logic with correct indentation
         try:
             self.collection = self.chroma_client.get_or_create_collection(
                 name="user_memories",
@@ -40,17 +48,16 @@ class PersonalizedMemoryModule:
                 embedding_function=self.emb_fn
             )
         except Exception as e:
-            # Handle embedding function conflict: if it fails, recreate
-            print(f"[MEMORY] Collection initialization failed ({e}), recreating to resolve conflict...")
+            print(f"[MEMORY] Collection conflict ({e}), recreating...")
             try:
                 self.chroma_client.delete_collection("user_memories")
-            except: pass
+            except: 
+                pass
             self.collection = self.chroma_client.get_or_create_collection(
                 name="user_memories",
                 metadata={"hnsw:space": "cosine"},
                 embedding_function=self.emb_fn
             )
-
     def _init_sqlite(self):
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
