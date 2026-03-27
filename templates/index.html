@@ -250,6 +250,9 @@
         let mediaRecorder;
         let audioChunks = [];
         let conversationId = null;
+        let currentMessageSkip = 0;
+        let isLoadingHistory = false;
+        let hasMoreHistory = true;
         let chartInstance = null;
 
         window.addEventListener('load', () => {
@@ -287,6 +290,18 @@
             try {
                 const res = await fetch(`/api/conversation-threads?_=${new Date().getTime()}`);
                 const data = await res.json();
+
+                // --- API LIMIT CATCHER ---
+                if (res.status === 429 || data?.error_type === "QUOTA_EXHAUSTED") {
+                    const indicatorToRemove = document.getElementById(typingId);
+                    if (indicatorToRemove) indicatorToRemove.remove();
+                    
+                    addMessage("⚠️ System Alert: My daily API limit has been reached. Please click Settings (⚙️) and paste a new Gemini API key.", "bot");
+                    
+                    const settingsModal = document.getElementById('settings-modal');
+                    if (settingsModal) settingsModal.style.display = 'block';
+                    return;
+                }
 
                 if (data.threads && data.threads.length > 0) {
                     const recent = data.threads[0];
@@ -346,26 +361,47 @@
         }
 
         async function loadConversation(id, isAutoRefresh = false) {
-            conversationId = id;
-            localStorage.setItem('lastConversationId', id);
-            const container = document.getElementById('messages-container');
-            container.innerHTML = '<div style="text-align: center; padding: 20px;">Loading memory...</div>';
+    conversationId = id;
+    localStorage.setItem('lastConversationId', id);
+    const container = document.getElementById('messages-container');
+    container.innerHTML = '<div style="text-align: center; padding: 20px;">Loading memory...</div>';
 
-            try {
-                const res = await fetch(`/api/conversation/${id}/messages`);
-                const data = await res.json();
+    // Reset pagination trackers for fresh chat
+    currentMessageSkip = 0;
+    hasMoreHistory = true;
 
-                container.innerHTML = '';
-                if (data.messages) {
-                    data.messages.forEach(msg => {
-                        addMessage(msg.text, msg.role);
-                    });
-                }
-                if (window.innerWidth < 768 && !isAutoRefresh) document.getElementById("sidebar").classList.remove("active");
-            } catch (e) {
-                console.error(e);
-            }
+    try {
+        // Notice the ?skip= parameter here
+        const res = await fetch(`/api/conversation/${id}/messages?skip=${currentMessageSkip}`);
+        const data = await res.json();
+
+        if (res.status === 429 || data?.error_type === "QUOTA_EXHAUSTED") {
+            const indicatorToRemove = document.getElementById(typingId);
+            if (indicatorToRemove) indicatorToRemove.remove();
+            addMessage("⚠️ System Alert: My daily API limit has been reached. Please click Settings (⚙️) and paste a new Gemini API key.", "bot");
+            const settingsModal = document.getElementById('settings-modal');
+            if (settingsModal) settingsModal.style.display = 'block';
+            return;
         }
+
+        container.innerHTML = ''; // Clear loading text
+        
+        if (data.messages && data.messages.length > 0) {
+            data.messages.forEach(msg => {
+                addMessage(msg.text, msg.role); // isPrepend defaults to false here
+            });
+            // Update tracker so next fetch starts after these messages
+            currentMessageSkip += data.messages.length;
+        } else {
+            container.innerHTML = '<div style="text-align: center; padding: 20px; color: #888;">No messages found. Say hello!</div>';
+        }
+
+        if (window.innerWidth < 768 && !isAutoRefresh) document.getElementById("sidebar").classList.remove("active");
+    } catch (e) {
+        console.error("Failed to load conversation:", e);
+        container.innerHTML = '<div style="color: red; padding: 10px;">Error loading history</div>';
+    }
+}
 
         async function confirmDelete(id, title) {
             if (confirm(`Are you sure you want to delete "${title}"? This cannot be undone.`)) {
@@ -376,6 +412,18 @@
                         body: JSON.stringify({ conversation_id: id })
                     });
                     const data = await res.json();
+
+                // --- API LIMIT CATCHER ---
+                if (res.status === 429 || data?.error_type === "QUOTA_EXHAUSTED") {
+                    const indicatorToRemove = document.getElementById(typingId);
+                    if (indicatorToRemove) indicatorToRemove.remove();
+                    
+                    addMessage("⚠️ System Alert: My daily API limit has been reached. Please click Settings (⚙️) and paste a new Gemini API key.", "bot");
+                    
+                    const settingsModal = document.getElementById('settings-modal');
+                    if (settingsModal) settingsModal.style.display = 'block';
+                    return;
+                }
                     if (data.success) {
                         if (conversationId === id) startNewSession();
                         loadHistory(true);
@@ -436,9 +484,30 @@
             try {
                 const res = await fetch('/api/settings');
                 const data = await res.json();
+
+                // --- API LIMIT CATCHER ---
+                if (res.status === 429 || data?.error_type === "QUOTA_EXHAUSTED") {
+                    const indicatorToRemove = document.getElementById(typingId);
+                    if (indicatorToRemove) indicatorToRemove.remove();
+                    
+                    addMessage("⚠️ System Alert: My daily API limit has been reached. Please click Settings (⚙️) and paste a new Gemini API key.", "bot");
+                    
+                    const settingsModal = document.getElementById('settings-modal');
+                    if (settingsModal) settingsModal.style.display = 'block';
+                    return;
+                }
                 if (data.settings) {
                     if (data.settings.gemini_api_key) {
-                        document.getElementById('gemini-key').value = data.settings.gemini_api_key;
+                        
+                        const keyInput = document.getElementById('gemini-key');
+                        if (data.masked_key) {
+                            // Force it into the value box so it is 100% visible
+                            keyInput.value = "Saved: " + data.masked_key;
+                        } else {
+                            keyInput.value = "";
+                            keyInput.placeholder = "Paste your AI_za... key here";
+                        }
+
                     }
                     if (data.settings.dark_mode) {
                         document.body.classList.add('dark-mode');
@@ -464,6 +533,18 @@
                     body: JSON.stringify({ api_key: key })
                 });
                 const data = await res.json();
+
+                // --- API LIMIT CATCHER ---
+                if (res.status === 429 || data?.error_type === "QUOTA_EXHAUSTED") {
+                    const indicatorToRemove = document.getElementById(typingId);
+                    if (indicatorToRemove) indicatorToRemove.remove();
+                    
+                    addMessage("⚠️ System Alert: My daily API limit has been reached. Please click Settings (⚙️) and paste a new Gemini API key.", "bot");
+                    
+                    const settingsModal = document.getElementById('settings-modal');
+                    if (settingsModal) settingsModal.style.display = 'block';
+                    return;
+                }
                 if (data.success) alert('Success: Key securely updated!');
                 else alert('Error: ' + data.message);
             } catch (e) {
@@ -493,6 +574,18 @@
                 });
                 const data = await res.json();
 
+                // --- API LIMIT CATCHER ---
+                if (res.status === 429 || data?.error_type === "QUOTA_EXHAUSTED") {
+                    const indicatorToRemove = document.getElementById(typingId);
+                    if (indicatorToRemove) indicatorToRemove.remove();
+                    
+                    addMessage("⚠️ System Alert: My daily API limit has been reached. Please click Settings (⚙️) and paste a new Gemini API key.", "bot");
+                    
+                    const settingsModal = document.getElementById('settings-modal');
+                    if (settingsModal) settingsModal.style.display = 'block';
+                    return;
+                }
+
                 if (res.ok) {
                     msgEl.style.color = '#10b981';
                     msgEl.textContent = 'Password changed successfully.';
@@ -512,6 +605,18 @@
             try {
                 const res = await fetch('/api/analytics/health');
                 const data = await res.json();
+
+                // --- API LIMIT CATCHER ---
+                if (res.status === 429 || data?.error_type === "QUOTA_EXHAUSTED") {
+                    const indicatorToRemove = document.getElementById(typingId);
+                    if (indicatorToRemove) indicatorToRemove.remove();
+                    
+                    addMessage("⚠️ System Alert: My daily API limit has been reached. Please click Settings (⚙️) and paste a new Gemini API key.", "bot");
+                    
+                    const settingsModal = document.getElementById('settings-modal');
+                    if (settingsModal) settingsModal.style.display = 'block';
+                    return;
+                }
 
                 if (data.success) {
                     const ctx = document.getElementById('healthChart').getContext('2d');
@@ -577,6 +682,18 @@
                 const res = await fetch(`/api/dashboard/timeline?_=${new Date().getTime()}`);
                 const data = await res.json();
 
+                // --- API LIMIT CATCHER ---
+                if (res.status === 429 || data?.error_type === "QUOTA_EXHAUSTED") {
+                    const indicatorToRemove = document.getElementById(typingId);
+                    if (indicatorToRemove) indicatorToRemove.remove();
+                    
+                    addMessage("⚠️ System Alert: My daily API limit has been reached. Please click Settings (⚙️) and paste a new Gemini API key.", "bot");
+                    
+                    const settingsModal = document.getElementById('settings-modal');
+                    if (settingsModal) settingsModal.style.display = 'block';
+                    return;
+                }
+
                 if (data.success && data.timeline.length > 0) {
                     container.innerHTML = data.timeline.map(t => `
                         <div class="timeline-item" style="background: rgba(255,255,255,0.05); padding: 12px; border-radius: 8px; display: flex; gap: 12px; align-items: start; position: relative; margin-bottom: 12px;">
@@ -611,6 +728,18 @@
             try {
                 const res = await fetch('/api/dashboard/report');
                 const data = await res.json();
+
+                // --- API LIMIT CATCHER ---
+                if (res.status === 429 || data?.error_type === "QUOTA_EXHAUSTED") {
+                    const indicatorToRemove = document.getElementById(typingId);
+                    if (indicatorToRemove) indicatorToRemove.remove();
+                    
+                    addMessage("⚠️ System Alert: My daily API limit has been reached. Please click Settings (⚙️) and paste a new Gemini API key.", "bot");
+                    
+                    const settingsModal = document.getElementById('settings-modal');
+                    if (settingsModal) settingsModal.style.display = 'block';
+                    return;
+                }
 
                 if (data.success && data.report) {
                     const medList = data.report.medical_history.length ?
@@ -670,6 +799,18 @@
                 const res = await fetch('/analyze', { method: 'POST', body: formData });
                 const data = await res.json();
 
+                // --- API LIMIT CATCHER ---
+                if (res.status === 429 || data?.error_type === "QUOTA_EXHAUSTED") {
+                    const indicatorToRemove = document.getElementById(typingId);
+                    if (indicatorToRemove) indicatorToRemove.remove();
+                    
+                    addMessage("⚠️ System Alert: My daily API limit has been reached. Please click Settings (⚙️) and paste a new Gemini API key.", "bot");
+                    
+                    const settingsModal = document.getElementById('settings-modal');
+                    if (settingsModal) settingsModal.style.display = 'block';
+                    return;
+                }
+
                 const indicatorToRemove = document.getElementById(typingId);
                 if (indicatorToRemove) indicatorToRemove.remove();
 
@@ -713,41 +854,98 @@
                 setOrbState('error');
             }
         }
-        function addMessage(text, role) {
-            const container = document.getElementById('messages-container');
 
-            const row = document.createElement('div');
-            row.className = `message-row ${role}`;
+        // --- THE INFINITE SCROLL ENGINE ---
+const msgsContainer = document.getElementById('messages-container');
+msgsContainer.addEventListener('scroll', async () => {
+    // If we hit the absolute top (0) and aren't already loading...
+    if (msgsContainer.scrollTop === 0 && !isLoadingHistory && hasMoreHistory && conversationId) {
+        await loadOlderMessages();
+    }
+});
 
-            const avatar = document.createElement('div');
-            avatar.className = 'avatar';
-            avatar.innerHTML = role === 'user' ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-robot"></i>';
+async function loadOlderMessages() {
+    isLoadingHistory = true;
+    const container = document.getElementById('messages-container');
 
-            const bubble = document.createElement('div');
-            bubble.className = 'message-bubble';
+    // 1. Show a tiny loading indicator at the top
+    const loader = document.createElement('div');
+    loader.id = 'history-loader';
+    loader.innerHTML = '<small style="color: #888;"><i>Loading older messages...</i></small>';
+    loader.style.textAlign = 'center';
+    loader.style.padding = '10px';
+    container.prepend(loader);
 
-            try {
-                const raw = marked.parse(text);
-                bubble.innerHTML = DOMPurify.sanitize(raw);
-            } catch (e) {
-                bubble.textContent = text;
-            }
+    // 2. MARK THE CURRENT SCROLL POSITION
+    // This is the magic that stops the screen from jumping when new messages appear
+    const oldScrollHeight = container.scrollHeight;
 
-            if (role === 'user') {
-                row.appendChild(bubble);
-                row.appendChild(avatar);
-            } else {
-                row.appendChild(avatar);
-                row.appendChild(bubble);
-            }
+    try {
+        const res = await fetch(`/api/conversation/${conversationId}/messages?skip=${currentMessageSkip}`);
+        const data = await res.json();
 
-            const isNearBottom = container.scrollHeight - container.scrollTop <= container.clientHeight + 150;
-            container.appendChild(row);
+        document.getElementById('history-loader')?.remove();
 
-            if (isNearBottom || role === 'user') {
-                row.scrollIntoView({ behavior: 'smooth', block: 'end' });
-            }
+        if (data.messages && data.messages.length > 0) {
+            // 3. Reverse the older batch so they prepend in correct chronological order!
+            const reversedOlderMessages = [...data.messages].reverse();
+            
+            reversedOlderMessages.forEach(msg => {
+                addMessage(msg.text, msg.role, true); // true = isPrepend
+            });
+
+            // 4. Update the tracker
+            currentMessageSkip += data.messages.length;
+
+            // 5. RESTORE THE SCROLL POSITION
+            container.scrollTop = container.scrollHeight - oldScrollHeight;
+        } else {
+            // No more history left in the database
+            hasMoreHistory = false;
         }
+    } catch (e) {
+        console.error("Failed to fetch older history:", e);
+        document.getElementById('history-loader')?.remove();
+    }
+    
+    isLoadingHistory = false;
+}
+        // ==========================================
+// 1. THE COMPLETE MESSAGE RENDERER
+// ==========================================
+function addMessage(text, role, isPrepend = false) {
+    const container = document.getElementById('messages-container');
+
+    const row = document.createElement('div');
+    row.className = `message-row ${role}`;
+
+    const avatar = document.createElement('div');
+    avatar.className = 'avatar';
+    avatar.innerHTML = role === 'user' ? '<i class="fa-solid fa-user"></i>' : '<i class="fa-solid fa-robot"></i>';
+
+    const bubble = document.createElement('div');
+    bubble.className = 'message-bubble';
+
+    try {
+        const raw = marked.parse(text);
+        bubble.innerHTML = DOMPurify.sanitize(raw);
+    } catch (e) {
+        console.error("Markdown parsing failed:", e);
+        bubble.textContent = text; // Fallback
+    }
+
+    // Assemble the bubble
+    row.appendChild(avatar);
+    row.appendChild(bubble);
+
+    // --- THE UI INJECTION ROUTER ---
+    if (isPrepend) {
+        container.prepend(row); // Pushes older messages to the TOP
+    } else {
+        container.appendChild(row); // Pushes new messages to the BOTTOM
+        container.scrollTop = container.scrollHeight;
+    }
+}
 
         function setOrbState(state) {
             const orb = document.getElementById('orb');
@@ -852,6 +1050,18 @@
                 const res = await fetch('/analyze', { method: 'POST', body: formData });
                 const data = await res.json();
 
+                // --- API LIMIT CATCHER ---
+                if (res.status === 429 || data?.error_type === "QUOTA_EXHAUSTED") {
+                    const indicatorToRemove = document.getElementById(typingId);
+                    if (indicatorToRemove) indicatorToRemove.remove();
+                    
+                    addMessage("⚠️ System Alert: My daily API limit has been reached. Please click Settings (⚙️) and paste a new Gemini API key.", "bot");
+                    
+                    const settingsModal = document.getElementById('settings-modal');
+                    if (settingsModal) settingsModal.style.display = 'block';
+                    return;
+                }
+
                 const indicatorToRemove = document.getElementById(typingId);
                 if (indicatorToRemove) indicatorToRemove.remove();
 
@@ -883,6 +1093,8 @@
                 sendMessage();
             }
         });
+             // --- WHATSAPP-STYLE INFINITE SCROLL ---
+
     </script>
 </body>
 </html>
