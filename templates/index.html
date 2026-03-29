@@ -164,15 +164,17 @@
                         <button class="save-btn" onclick="deleteAccount()" style="background: #ef4444; width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
                             <i class="fa-solid fa-trash-can"></i> Delete My Account
                         </button>
+                        
+                        <div style="text-align: center; margin-top: 12px; font-size: 0.65rem; color: #ff4d4d; text-transform: uppercase; letter-spacing: 1.5px; font-weight: 600; text-shadow: 0 0 5px rgba(255, 77, 77, 0.8), 0 0 10px rgba(255, 77, 77, 0.4), 0 0 15px rgba(255, 0, 0, 0.2);">
+                            <i class="fa-solid fa-shield-halved" style="margin-right: 4px;"></i> Enforces your Right to be Forgotten
+                        </div>
                     </div>
                 </div>
-            </div>
-
-            <div id="tab-api" class="tab-content" style="display: none;">
+            </div> <div id="tab-api" class="tab-content" style="display: none;">
                 <div class="setting-group" style="background: rgba(0, 243, 255, 0.05); border: 1px solid rgba(0, 243, 255, 0.2); padding: 15px; border-radius: 8px;">
                     <label style="color: var(--accent-color); font-weight: 600; margin-bottom: 8px; display: block;">Gemini API Key</label>
                     <p style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 12px;">
-                        To power the AGI Therapist, you need a Google GenAI key. 
+                        To power the AGI Therapist, you need a Google GenAI key.
                         <a href="https://aistudio.google.com/app/apikey" target="_blank" style="color: var(--accent-color); text-decoration: none;">
                             <i class="fa-solid fa-book-open-reader"></i> Get your free key here
                         </a>
@@ -182,18 +184,14 @@
                         <button class="save-btn" onclick="saveApiKey()">Save</button>
                     </div>
                 </div>
-            </div>
-
-            <div id="tab-insights" class="tab-content" style="display: none;">
+            </div> <div id="tab-insights" class="tab-content" style="display: none;">
                 <div class="setting-group">
                     <label>Long-Term Condition Analysis</label>
                     <div style="height: 250px; width: 100%;">
                         <canvas id="healthChart"></canvas>
                     </div>
                 </div>
-            </div>
-
-        </div>
+            </div> </div>
     </div>
 
     <div class="modal-overlay" id="dashboard-modal" onclick="closeDashboard(event)">
