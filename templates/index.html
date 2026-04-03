@@ -137,6 +137,17 @@
             </div>
 
             <div id="tab-general" class="tab-content">
+                <div class="setting-group" style="margin-bottom: 20px;">
+                    <label>Your Account ID (Ghost ID)</label>
+                    <div style="display: flex; gap: 10px; align-items: center; background: rgba(0,0,0,0.2); padding: 10px 15px; border-radius: 8px; border: 1px solid var(--glass-border);">
+                        <i class="fa-solid fa-user-secret" style="color: var(--accent-color);"></i>
+                        <span id="display-user-id" style="font-family: monospace; font-size: 0.9rem; color: #cbd5e1; user-select: all;">{{ user_id }}</span>
+                        <button onclick="copyUserId(event)" class="action-btn" style="margin-left: auto; width: 32px; height: 32px; font-size: 0.85rem; border: 1px solid rgba(255,255,255,0.1);" title="Copy ID">
+                            <i class="fa-regular fa-copy"></i>
+                        </button>
+                    </div>
+                    <div style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 6px;">Keep this safe. You can use this to log back into your session.</div>
+                </div>
                 <div class="setting-group">
                     <label>Interface Theme</label>
                     <div style="display: flex; gap: 12px; align-items: center;">
@@ -238,6 +249,19 @@
         .delete-btn { position: absolute; right: 8px; top: 50%; transform: translateY(-50%); width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #ef4444; background: rgba(239, 68, 68, 0.1); border: none; cursor: pointer; opacity: 0; transition: all 0.2s; }
         .history-item:hover .delete-btn, .timeline-item:hover .delete-btn { opacity: 1; }
         .delete-btn:hover { background: #ef4444; color: white; }
+        .history-item:hover .delete-btn, .timeline-item:hover .delete-btn { opacity: 1; }
+        .delete-btn:hover { background: #ef4444; color: white; }
+
+        /* --- MIC RECORDING ANIMATION --- */
+        @keyframes pulseRed {
+            0% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+            70% { transform: scale(1.1); box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+            100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+        }
+        .recording-pulse {
+            animation: pulseRed 1.5s infinite;
+            color: #ef4444 !important;
+        }
     </style>
     <style>
         @media (max-width: 768px) { #orb-container, #status-bar { display: none !important; } .chat-area { margin-bottom: 20px; } }
@@ -282,7 +306,26 @@
             setOrbState('listening');
             if (window.innerWidth < 768) document.getElementById("sidebar").classList.remove("active");
         }
+        async function toggleMic() {
+    const btn = document.getElementById('mic-btn');
+    
+    // Check if we are on an insecure connection first
+    if (window.location.protocol === 'http:' && window.location.hostname !== 'localhost') {
+        alert("⚠️ Security Note: Voice features require a secure HTTPS connection. Please contact the administrator.");
+        return;
+    }
 
+    try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        // ... rest of your recorder logic ...
+    } catch (e) {
+        if (e.name === 'NotAllowedError' || e.name === 'PermissionDeniedError') {
+            alert("🎤 I can't hear you! Please click the 'Lock' icon in your browser address bar and set Microphone to 'Allow'.");
+        } else {
+            console.error(e);
+        }
+    }
+}
         async function loadHistory() {
             const container = document.getElementById('history-list');
             try {
@@ -1092,7 +1135,43 @@ function addMessage(text, role, isPrepend = false) {
             }
         });
              // --- WHATSAPP-STYLE INFINITE SCROLL ---
-
+        function copyUserId(event) {
+            const userId = document.getElementById('display-user-id').innerText;
+            
+            // 1. Create a temporary, invisible text box
+            const tempTextArea = document.createElement("textarea");
+            tempTextArea.value = userId;
+            
+            // 2. Move it off-screen so the user doesn't see it flash
+            tempTextArea.style.position = "absolute";
+            tempTextArea.style.left = "-999999px";
+            document.body.appendChild(tempTextArea);
+            
+            // 3. Highlight the text inside it
+            tempTextArea.select();
+            
+            try {
+                // 4. Force the browser to copy the highlighted text (Works on HTTP!)
+                document.execCommand('copy');
+                
+                // 5. Quick visual feedback (Green Checkmark)
+                const btn = event.currentTarget || window.event.srcElement;
+                const icon = btn.querySelector('i');
+                icon.className = 'fa-solid fa-check';
+                icon.style.color = '#10b981'; 
+                
+                setTimeout(() => {
+                    icon.className = 'fa-regular fa-copy';
+                    icon.style.color = '';
+                }, 2000);
+            } catch (err) {
+                console.error('Failed to copy ID:', err);
+                alert("Failed to copy. Please select the text manually.");
+            }
+            
+            // 6. Destroy the temporary text box
+            document.body.removeChild(tempTextArea);
+        } 
     </script>
 </body>
 </html>
