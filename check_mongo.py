@@ -3,7 +3,7 @@ from pymongo import MongoClient
 from dotenv import load_dotenv
 
 load_dotenv()
-mongo_uri = os.getenv("MONGO_URI", "mongodb+srv://abc:1234@cluster0.jlrvd9l.mongodb.net/")
+mongo_uri = os.getenv("MONGO_URI", "")
 
 try:
     client = MongoClient(mongo_uri, serverSelectionTimeoutMS=5000)
