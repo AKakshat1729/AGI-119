@@ -1,4 +1,4 @@
-API_KEY = "d39d6cb8059442788bb7af73239f1928"
+API_KEY = ""
 
 # API Key Validation
 def validate_api_keys():
