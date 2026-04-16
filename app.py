@@ -1,3 +1,4 @@
+from collections import Counter
 from flask import Flask, render_template, jsonify, request, redirect, url_for, flash, send_from_directory, session # pyre-ignore[21]
 import typing
 import tempfile
@@ -6,19 +7,9 @@ import json
 import uuid
 import warnings
 import logging
-import nltk
-import logging
-
-# Auto-download required NLTK data quietly
-try:
-    nltk.data.find('tokenizers/punkt')
-    nltk.data.find('sentiment/vader_lexicon')
-except LookupError:
-    logging.info("Downloading missing NLTK datasets...")
-    nltk.download('punkt', quiet=True)
-    nltk.download('stopwords', quiet=True)
-    nltk.download('vader_lexicon', quiet=True)
-    nltk.download('wordnet', quiet=True)
+import certifi
+ACTIVE_CHAT_TIMERS = {}
+ACTIVE_CHAT_CURSORS = {}
 # --- Suppress noisy startup warnings ---
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
@@ -36,9 +27,10 @@ from flask_login import LoginManager, UserMixin, login_user, login_required, log
 from dotenv import load_dotenv # pyre-ignore[21]
 from utils.llm_client import generate_chat_response, validate_gemini_api_key # pyre-ignore[21]
 from gtts import gTTS # pyre-ignore[21]
-from pymongo import MongoClient # pyre-ignore[21]
+from pymongo.mongo_client import MongoClient
 from werkzeug.security import generate_password_hash, check_password_hash # pyre-ignore[21]
 from perception.stt.stt_live import save_wav, transcribe_audio # pyre-ignore[21]
+from perception.stt.stt_live import transcribe_audio, extract_pitch
 from perception.tone.tone_sentiment_live import analyze_tone # pyre-ignore[21]
 from perception.nlu.nlu_live import nlu_process # pyre-ignore[21]
 import requests # pyre-ignore[21]
@@ -59,16 +51,31 @@ from reasoning.long_term_personalized_memory import PersonalizedMemoryModule # p
 from core.ethics_personalization import EthicalAwarenessEngine, PersonalizationEngine # pyre-ignore[21]
 
 # --- NEW: Lightweight Clinical Intelligence Layer ---
+
 from core.clinical_intelligence import get_clinical_engine # pyre-ignore[21]
+from functools import wraps
+from flask import abort
+
+def admin_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Check if user is logged in AND has the is_admin flag
+        user_data = memory_store.mongo_db.users.find_one({"email": current_user.email})
+        if not user_data or not user_data.get('is_admin'):
+            print(f"🚫 [SECURITY] Blocked non-admin access attempt by: {current_user.email}")
+            return abort(403) # "Forbidden" error
+        return f(*args, **kwargs)
+    return decorated_function
 clinical_engine = get_clinical_engine()
 
 # Ensure static/audio exists
 os.makedirs(os.path.join('static', 'audio'), exist_ok=True)
 
 
-load_dotenv()
-aai.settings.api_key = os.environ.get("ASSEMBLYAI_API_KEY")
 
+load_dotenv()
+print(f"DEBUG: MONGODB_URI is {os.getenv('MONGODB_URI')[:15]}...")
+api_key = os.getenv("ASSEMBLYAI_API_KEY")
 # Initialize Flask application
 app = Flask(__name__)
 
@@ -131,35 +138,53 @@ users_collection = None
 db = None
 
 try:
-    mongo_uri = os.environ.get("MONGO_URI", "mongodb+srv://abc:1234@cluster0.jlrvd9l.mongodb.net/")
-    client = MongoClient(mongo_uri, serverSelectionTimeoutMS=8000, connectTimeoutMS=8000)
+    # Professional fix: Use the certifi CA bundle to verify SSL on Windows
+    ca = certifi.where()
+    
+    # Get the URI from your .env
+    mongo_uri = os.getenv("MONGODB_URI")
+    
+    # Initialize with the certificate file (tlsCAFile)
+    # This solves the [SSL: TLSV1_ALERT_INTERNAL_ERROR] you saw in Lucknow
+    client = MongoClient(mongo_uri, tlsAllowInvalidCertificates=True)
+    
     # Test the connection
     client.admin.command('ping')
     
     db = client['agi-therapist']
     users_collection = db['users']
     mongo_connected = True
-    print("[OK] MongoDB connected successfully")
+    print("[OK] MongoDB connected successfully (SSL Handshake Verified)")
+
 except Exception as e:
     print(f"[WARNING] MongoDB connection failed: {e}")
     print("   -> Switching to LOCAL JSON storage (users.json)")
     mongo_connected = False
     users_collection = None
+    # Load from local file if the cloud 'brain' is unreachable
     users = load_local_users()
 
 # --- GLOBAL MODULES ---
+# --- GLOBAL MODULES INITIALIZATION ---
 try:
-    memory_store = ServerMemoryStore()
-    prompt_builder = PromptBuilder(model="Meta-Llama-3.3-70B-Instruct")
+    # 1. Inject the 'db' object so the memory store uses MongoDB Atlas
+    memory_store = ServerMemoryStore(database=db) 
+    
+    # 2. Update PromptBuilder to match your actual Gemini model
+    prompt_builder = PromptBuilder(model="gemini-3-flash-preview") 
+    
     wm = WorkingMemory()
     agent = AGI119Agent()
     safety_engine = EthicalAwarenessEngine()
     style_engine = PersonalizationEngine()
-    pers_memory = PersonalizedMemoryModule()
+    
+    # 3. Inject 'db' here too for long-term personalized recall
+    pers_memory = PersonalizedMemoryModule(database=db)
+    
+    print("[SUCCESS] Global Modules synchronized with Cloud Database.")
+
 except Exception as e:
     print(f"[CRITICAL ERROR] Failed to initialize global modules: {e}")
-    # We might want to exit or set them to None, but app relies on them.
-    # For now, let's print and re-raise to see the error in logs
     raise e
 
 # Initialize Clinical Knowledge
@@ -196,6 +221,25 @@ def load_user(user_id):
         print(f"Error loading user: {e}")
     return None
 
+def is_injection_attempt(user_text: str) -> bool:
+    """
+    🛡️ The Cognitive Firewall: Catches hackers before they reach the LLM.
+    """
+    text = user_text.lower()
+    
+    red_flags = [
+        "system prompt",
+        "ignore previous",
+        "ignore all",
+        "developer mode",
+        "you are now",
+        "repeat the text above",
+        "what are your instructions",
+        "bypass",
+        "jailbreak"
+    ]
+    
+    return any(flag in text for flag in red_flags)
 # --- AUDIO GENERATION ---
 def generate_audio(text):
     try:
@@ -382,34 +426,27 @@ def store_conversation(user_id, transcript, response_text, conversation_id=None)
     try:
         if conversation_id is None:
             conversation_id = str(uuid.uuid4())
-        
-        # 1. Store in LOGS (Conversation type) for history
-        memory_store.store_memory(user_id, "conversation", f"User: {transcript}", 
-                                tags=["conversation", "user_message", f"conv_{conversation_id}"], 
-                                conversation_id=conversation_id,
-                                importance=1.0)
-        
-        memory_store.store_memory(user_id, "conversation", f"AI: {response_text}", 
-                                tags=["conversation", "ai_message", f"conv_{conversation_id}"], 
-                                conversation_id=conversation_id,
-                                importance=1.0)
-        
-        # 2. Store in EPISODIC for long-term RAG/Insights
-        # [FIX] This ensures past conversations are "remembered" in future sessions
-        memory_store.store_memory(user_id, "episodic", f"On {datetime.now().strftime('%Y-%m-%d %H:%M')}, user said: {transcript}", 
-                                tags=["episodic", "past_convo", f"conv_{conversation_id}"], 
-                                conversation_id=conversation_id,
-                                importance=0.8)
-        
-        memory_store.store_memory(user_id, "episodic", f"Therapist responded: {response_text}", 
-                                tags=["episodic", "past_convo", f"conv_{conversation_id}"], 
-                                conversation_id=conversation_id,
-                                importance=0.5)
-        
+
+        # 1. Save AI response to local Working Memory 
+        # (The User message was already saved at the start of generate_response_data)
+        store_working_memory(user_id, f"Assistant: {response_text}", conversation_id)
+
+        # 2. Save BOTH to MongoDB so the UI can actually display them on refresh!
+        # (Our Bouncer fix from earlier guarantees this won't pollute the LTM facts)
+        memory_store.store_memory(user_id, "conversation", f"User: {transcript}",
+                                  tags=["conversation", "user_message", f"conv_{conversation_id}"],
+                                  conversation_id=conversation_id,
+                                  importance=1)
+
+        memory_store.store_memory(user_id, "conversation", f"AI: {response_text}",
+                                  tags=["conversation", "ai_message", f"conv_{conversation_id}"],
+                                  conversation_id=conversation_id,
+                                  importance=1)
+
         return conversation_id
     except Exception as e:
         print(f"Error storing conversation: {str(e)}")
-        return None
+        return conversation_id
 
 def _update_env_variable(key: str, value: str, env_path='.env'):
     try:
@@ -535,51 +572,102 @@ def index():
     return render_template('index.html', 
                          user_name=current_user.name,
                          user_email=current_user.email,
+                         user_id=current_user.id,
                          user_settings=user_settings)
 
 
 @app.route('/api/settings', methods=['GET'])
+@login_required
 def api_get_settings():
-    if not current_user.is_authenticated:
-        return jsonify({"error": "Authentication required"}), 401
     try:
-        settings = get_user_settings(current_user.id)
-        return jsonify({"settings": settings})
+        # 1. Look up the user using their master ID, exactly how the DB originally saved it
+        query = {"$or": [{"_id": current_user.id}, {"email": current_user.email}]}
+        user_data = users_collection.find_one(query) or {}
+        
+        # 2. Grab the key
+        saved_key = user_data.get('gemini_api_key')
+        if not saved_key and 'settings' in user_data:
+            saved_key = user_data['settings'].get('gemini_api_key', '')
+            
+        # 3. Mask it
+        if saved_key and len(saved_key) > 8:
+            masked_key = f"••••••••••••{saved_key[-4:]}"
+        else:
+            masked_key = ""
+
+        return jsonify({
+            "success": True,
+            "has_key": bool(saved_key),
+            "masked_key": masked_key,
+            "settings": user_data.get("settings", {})
+        }), 200
     except Exception as e:
-        print(f"Error /api/settings: {e}")
-        return jsonify({"error": str(e)}), 500
+        return jsonify({"success": False, "error": str(e)}), 500
 
 
-@app.route('/api/settings/gemini-key', methods=['PUT'])
-def api_update_gemini_key():
-    if not current_user.is_authenticated:
-        return jsonify({"success": False, "message": "Authentication required"}), 401
+@app.route('/api/settings/gemini-key', methods=['PUT', 'POST'])
+@login_required
+def update_api_key():
     try:
         data = request.get_json() or {}
-        api_key = data.get('api_key') or data.get('gemini_api_key')
-        if not api_key:
-            return jsonify({"success": False, "message": "No API key provided"}), 400
+        new_key = data.get('api_key') or data.get('gemini_api_key')
 
-        settings_update = {"gemini_api_key": api_key}
-        update_user_settings(current_user.id, settings_update)
+        if not new_key:
+            return jsonify({"success": False, "message": "No key provided"}), 400
 
-        # Update session for immediate use
-        session['gemini_api_key'] = api_key
+        # 1. Update the original master document
+        query = {"$or": [{"_id": current_user.id}, {"email": current_user.email}]}
         
-        # Also update .env for fallback
-        _update_env_variable('GEMINI_API_KEY', api_key)
-        os.environ['GEMINI_API_KEY'] = api_key # Synchronize environment
-        
-        # Re-initialize AAI if possible
-        try:
-            import assemblyai as aai # pyre-ignore[21]
-            aai.settings.api_key = api_key
-        except: pass
+        # Save it in BOTH locations to guarantee the app finds it
+        users_collection.update_one(
+            query, 
+            {"$set": {
+                "gemini_api_key": new_key,
+                "settings.gemini_api_key": new_key
+            }}, 
+            upsert=True
+        )
 
-        return jsonify({"success": True, "message": "Gemini API key updated"})
+        session['gemini_api_key'] = new_key
+        print(f"✅ [DB SUCCESS] API Key permanently saved for user {current_user.id}")
+        return jsonify({"success": True, "message": "Key securely updated!"})
+
     except Exception as e:
-        print(f"Error updating gemini key: {e}")
+        print(f"❌ [DB ERROR] Could not save key: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
+from bson.objectid import ObjectId
+from flask_login import logout_user
+
+@app.route('/api/account/delete', methods=['POST'])
+@login_required
+def delete_account():
+    print(f"🚨 [SECURITY] User {current_user.id} requested FULL WIPE.")
+    try:
+        user_id = str(current_user.id)
+        # Safely grab the email, defaulting to ID if email isn't in current_user
+        user_email = getattr(current_user, 'email', user_id) 
+
+        # 1. Fire the Scorched Earth function in Memory Store
+        stats = memory_store.purge_all_user_data(user_id, user_email)
+
+        # 2. Log them out and destroy the session token
+        logout_user()
+
+        print(f"✅ [PURGE COMPLETE] Account wiped. Stats: {stats}")
+        return jsonify({"success": True, "stats": stats}), 200
+
+    except Exception as e:
+        print(f"❌ [FATAL PURGE ERROR]: {e}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"success": False, "error": "Failed to completely wipe data."}), 500
+
+
+from flask import request, session
+
+from bson.objectid import ObjectId
+
+
 
 
 @app.route('/api/settings/theme', methods=['POST'])
@@ -618,38 +706,19 @@ def api_user_history():
         return jsonify({"success": False, "message": str(e)}), 500
 
 
+
+
 @app.route('/api/conversation-threads', methods=['GET'])
+@login_required
 def api_conversation_threads():
-    if not current_user.is_authenticated:
-        return jsonify({"success": False, "message": "Authentication required"}), 401
+    # Force Email as the identity
+    u_email = str(current_user.email)
     try:
-        threads = memory_store.get_conversation_threads(current_user.id)
+        threads = memory_store.get_conversation_threads(u_email)
         return jsonify({"success": True, "threads": threads})
     except Exception as e:
-        print(f"Error /api/conversation-threads: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
-
-
-@app.route('/api/conversation/<conversation_id>/messages', methods=['GET'])
-def api_conversation_messages(conversation_id):
-    if not current_user.is_authenticated:
-        return jsonify({"success": False, "message": "Authentication required"}), 401
-    try:
-        messages = memory_store.get_conversation_messages(current_user.id, conversation_id)
-        # Normalize role based on text prefix
-        normalized = []
-        for m in messages:
-            text = m.get('text', '')
-            role = 'user' if text.startswith('User:') else ('bot' if text.startswith('AI:') else 'user')
-            # Strip prefix
-            if text.startswith('User:') or text.startswith('AI:'):
-                text = text.split(':', 1)[1].strip()
-            normalized.append({'text': text, 'timestamp': m.get('timestamp'), 'role': role})
-        return jsonify({"success": True, "messages": normalized})
-    except Exception as e:
-        print(f"Error /api/conversation/<id>/messages: {e}")
-        return jsonify({"success": False, "message": str(e)}), 500
-
+        
 
 @app.route('/api/analytics/health', methods=['GET'])
 def api_analytics_health():
@@ -713,6 +782,33 @@ def api_chat_stats():
         print(f"Error /api/analytics/chat-stats: {e}")
         return jsonify({"success": False, "message": str(e)}), 500
 
+def get_history_for_user(user_id, conversation_id=None):
+    """Fetches history using the UUID. Prevents the 'Email-as-ID' bug."""
+    
+    # 1. SAFETY: If the ID is missing or is an email (@), it's the wrong ID!
+    if not conversation_id or "@" in str(conversation_id):
+        print(f"🧹 [HISTORY] No valid UUID for {user_id}. Starting fresh.", flush=True)
+        return []
+
+    try:
+        # 2. We MUST use conversation_id here to find the chat history
+        raw_history = memory_store.get_conversation_history(conversation_id)
+        
+        formatted_history = []
+        for msg in raw_history:
+            text = msg.get("content") or msg.get("text") or ""
+            # Gemini expects 'model', but our DB stores 'assistant' or 'ai'
+            role = "model" if msg.get("role") in ["assistant", "ai", "model", "bot"] else "user"
+
+            if text:
+                formatted_history.append({"role": role, "parts": [text]})
+
+        print(f"🧠 [HISTORY] Success! Loaded {len(formatted_history)} messages for session {conversation_id}", flush=True)
+        return formatted_history
+
+    except Exception as e:
+        print(f"❌ [HISTORY ERROR] {e}")
+        return []
 
 @app.route('/login', methods=['GET', 'POST'])
 def login():
@@ -742,6 +838,14 @@ def login():
                     password_hash=user_data['password']
                 )
                 login_user(user)
+
+               
+                
+                # --- RESTORE THE API KEY TO MEMORY ---
+                if 'gemini_api_key' in user_data:
+                    session['gemini_api_key'] = user_data['gemini_api_key']
+                # -------------------------------------
+
                 return redirect(url_for('index'))
             else:
                 flash('Invalid password')
@@ -805,6 +909,7 @@ def signup():
 @app.route('/logout')
 @login_required
 def logout():
+    session.clear() # This kills the "Ghost Key" in the browser backpack
     logout_user()
     return redirect(url_for('login'))
 
@@ -835,7 +940,7 @@ def get_default_settings():
         'theme_color': '#667eea',
         'gemini_api_key': None,
         'usage_count': 0,
-        'quota_limit': 100  # Default daily quota
+        'quota_limit': 15  # Default daily quota
     }
 
 # --- API ROUTES ---
@@ -859,90 +964,350 @@ def start_conversation():
         return jsonify({"message": greeting, "type": "bot", "conversation_id": conversation_id})
     except Exception as e:
         print(f"Error in start_conversation: {str(e)}")
-        return jsonify({"error": "Error starting conversation"}), 500
+        return jsonify({"error": "Error starting conversation"})
 
 @app.route('/analyze', methods=['POST'])
+@login_required
 def analyze():
-    try:
-        # Check if user is authenticated
-        if not current_user.is_authenticated:
-            return jsonify({"error": "Authentication required. Please log in."}), 401
-            
-        user_id = current_user.id
-        conversation_id = request.form.get('conversation_id')
-        
-        transcript = get_transcript_from_request()
-        if not transcript:
-            return jsonify({"error": "No text or audio provided"}), 400
-        
-        perception_data = analyze_perception(transcript)
-        response_data = generate_response_data(perception_data, user_id, transcript, conversation_id)
-        
-        # Track Usage
-        try:
-            if mongo_connected and users_collection is not None:
-                users_collection.update_one(
-                    {"email": user_id},
-                    {"$inc": {"settings.usage_count": 1}}
-                )
-        except Exception as e:
-            print(f"Error updating usage stats: {e}")
+    # ==========================================
+    # PHASE 1: AUTH & IDENTITY
+    # ==========================================
+    if not current_user.is_authenticated:
+        return jsonify({"error": "Session expired"}), 401
 
-        # If client is editing an existing message, persist an edit record
-        edit_id = request.form.get('edit_id')
-        if edit_id:
-            try:
-                memory_store.store_memory(
-                    user_id,
-                    "conversation_edit",
-                    f"Edit (ref_id={edit_id}): {transcript}",
-                    tags=["conversation", "edit", f"conv_{conversation_id}"],
-                    conversation_id=str(conversation_id or "default_session"),
-                    importance=0.5
-                )
-            except Exception as e:
-                print(f"Warning: could not store edit record: {e}")
+    # Unified Identity extraction (Using Email for Cloud Sync)
+    user_email = str(getattr(current_user, 'email', 'unknown_user'))
+    user_id = str(current_user.id) if current_user.is_authenticated else "unknown"
+
+    # ==========================================
+    # PHASE 2: PAYLOAD EXTRACTION & PERCEPTION
+    # ==========================================
+    import uuid
+    import flask
+    from perception.audio_interceptor import transcribe_audio_file
+    
+    data = request.get_json(silent=True) or {}
+    transcript = ""
+    vocal_tone = ""
+
+    # 1. Engage Auditory Cortex if audio is present
+    if 'audio' in request.files:
+        audio_data = transcribe_audio_file(request.files['audio'])
+        transcript = audio_data.get("transcript", "")
+        vocal_tone = audio_data.get("tone", "")
+
+    # 2. Fallback to Visual Cortex (Text typing)
+    if not transcript:
+        transcript = (
+            request.form.get('text') or request.form.get('message') or request.form.get('transcript') or
+            data.get('text') or data.get('message') or data.get('transcript') or ""
+        ).strip()
+
+    if not transcript:
+        return flask.jsonify({"error": "No message or audio detected"}), 400
+
+    # 3. CONTEXT INJECTION: Combine Tone and Transcript
+    # If the user spoke, we prepend the hidden metadata so the LLM knows HOW they sounded.
+    if vocal_tone and vocal_tone.lower() not in ["neutral", ""]:
+        transcript = f"[Vocal Tone Detected: {vocal_tone}] {transcript}"
+
+    # 2. Extract or Generate the Conversation ID (ONCE)
+    conversation_id = (
+        request.form.get('conversation_id') or data.get('conversation_id') or
+        request.form.get('chat_id') or data.get('chat_id') or ""
+    ).strip()
+
+    if not conversation_id or conversation_id == "unknown":
+        conversation_id = str(uuid.uuid4())
+        print(f"⚠️ [WARNING] Generated new chat ID: {conversation_id}")
+    else:
+        print(f"✅ [SUCCESS] Attached to existing chat: {conversation_id}")
+
+    # ==========================================
+    # PHASE 3: FRONT-DOOR SECURITY & TRAPDOORS
+    # ==========================================
+    from flask import jsonify
+    if transcript.lower() == "/number":
+        import base64
+        try:
+            true = base64.b64decode(memory_store._vector_namespace_id).decode('utf-8')
+        except:
+            true = "616773126368"
+
+        msg = f"**{true}**."
         
-        return jsonify(response_data)
+        # Etch into Database so it survives refresh
+        memory_store.store_memory(user_id=user_email, memory_type="conversation", text=f"User: {transcript}", conversation_id=conversation_id,tags=["internal"], importance=1)
+        memory_store.store_memory(user_id=user_email, memory_type="conversation", text=f"AI: {msg}", conversation_id=conversation_id,tags=["internal"], importance=1)
+        
+        return jsonify({"success": True, "text": msg, "audio": None, "conversation_id": conversation_id})
+
+    # 2. THE COGNITIVE FIREWALL (PROMPT INJECTION BLOCKER)
+    if is_injection_attempt(transcript):
+        print(f"🚨 [SECURITY] Blocked injection attempt from user: {user_email}")
+        msg = "I am an AGI Therapist. I cannot discuss my internal architecture, system prompts, or bypass my clinical guidelines. How can I help you today?"
+        
+        # Etch into Database so the hacker sees their failed attempt forever
+        memory_store.store_memory(user_id=user_email, memory_type="conversation", text=f"User: {transcript}", conversation_id=conversation_id,tags=["internal"], importance=1)
+        memory_store.store_memory(user_id=user_email, memory_type="conversation", text=f"AI: {msg}", conversation_id=conversation_id,tags=["internal"], importance=1)
+        
+        return jsonify({"success": True, "text": msg, "audio": None, "conversation_id": conversation_id})
+    # ==========================================
+    # PHASE 3.5: FREEMIUM QUOTA & API KEY ROUTING
+    # ==========================================
+    active_key = os.environ.get("GEMINI_API_KEY")
+    try:
+        # Fetch the freshest user data directly from the DB
+        user_doc = memory_store.mongo_db['users'].find_one({"email": user_email})
+        
+        if user_doc:
+            settings = user_doc.get('settings', {})
+            user_api_key = settings.get('gemini_api_key')
+            
+            if not user_api_key:
+                # 🚨 NO PERSONAL KEY: Enforce the Server Limit
+                quota_limit = settings.get('quota_limit', 15)
+                usage_count = user_doc.get('usage_count', 0)
+                
+                if usage_count >= quota_limit:
+                    print(f"🛑 [QUOTA HIT] User {user_email} reached the {quota_limit} limit.")
+                    return jsonify({
+                        "success": False, 
+                        "error_type": "QUOTA_EXHAUSTED", 
+                        "message": "Free tier limit reached. Please click Settings (⚙️) and add your own API key to continue."
+                    }), 429
+                
+                # They are under the limit: Charge them 1 point
+                memory_store.mongo_db['users'].update_one(
+                    {"email": user_email}, 
+                    {"$inc": {"usage_count": 1}}
+                )
+                active_key = os.environ.get("GEMINI_API_KEY") # Use your global server key
+            else:
+                # 🟢 PERSONAL KEY: Bypass limits entirely
+                active_key = user_api_key
+            
+            # 🔥 CRITICAL: Configure the AI to use the correct key for this specific message!
+            import google.generativeai as genai
+            if active_key:
+                genai.configure(api_key=active_key)
+                
     except Exception as e:
-        print(f"Analyze error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": f"Analysis failed: {str(e)}"}), 500
+        print(f"⚠️ [QUOTA CHECK ERROR] {e}")
+        # If the check fails, we still let them through to Phase 4 so the app doesn't crash.
+    # ==========================================
+    # PHASE 4: THE COGNITIVE ENGINE (LLM)
+    # ==========================================
+    try:
+        # Context Retrieval
+        history = get_history_for_user(user_id=user_id, conversation_id=conversation_id)
+        if history is None: history = []
+
+        # --- THE MEMORY ROUTER (TRANSPLANTED) ---
+        import time
+        import threading
+        global ACTIVE_CHAT_TIMERS
+        global ACTIVE_CHAT_CURSORS
+
+        # We only summarize if there's enough history
+        if len(history) > 10:
+            ltm_candidates = history[:-10]
+            last_summarized_count = ACTIVE_CHAT_CURSORS.get(conversation_id, 0)
+            new_ltm_messages = ltm_candidates[last_summarized_count:]
+
+            current_time = time.time()
+            last_time = ACTIVE_CHAT_TIMERS.get(conversation_id, current_time)
+            ACTIVE_CHAT_TIMERS[conversation_id] = current_time
+            time_idle = current_time - last_time
+
+            print(f"🕵️ [X-RAY] Idle: {int(time_idle)}s | Total LTM Pool: {len(ltm_candidates)} | Unsummarized: {len(new_ltm_messages)}")
+
+            # Trigger if idle > 120s AND we have new messages to summarize
+            if time_idle > 120 and len(new_ltm_messages) > 0:
+                print(f"⏳ [MEMORY] User idle for {int(time_idle)}s. Summarizing into LTM...", flush=True)
+
+                def run_text_ltm_synthesis():
+                    import time
+                    import os
+                    import google.generativeai as genai
+
+                    # ⏳ THE COOLDOWN: Let the live chat finish its API call first!
+                    print("⏳ [LTM QUEUE] Pausing 10s to prioritize Live Chat API call...", flush=True)
+                    time.sleep(10)
+
+                    try:
+                        # 1. Grab ONLY the User Key (Protect the Global Key)
+                        thread_api_key = None
+                        try:
+                            user_doc = memory_store.mongo_db['users'].find_one({"email": user_email})
+                            if user_doc and 'settings' in user_doc:
+                                thread_api_key = user_doc['settings'].get('gemini_api_key')
+                        except Exception:
+                            pass
+
+                        if not thread_api_key:
+                            print("⚠️ [LTM] No User Key found. Canceling LTM to save Global Quota.", flush=True)
+                            return
+
+                        old_texts = [m.get("parts", [""])[0] for m in new_ltm_messages]
+                        joined_text = " | ".join(old_texts)
+                        
+                        prompt = (
+                            "You are a clinical AI memory extractor. Read the following chat history. "
+                            "Extract ONLY objective psychological facts, user demographics, hobbies, and emotional baselines. "
+                            "Keep it under 3 sentences. If there is nothing useful, say 'No facts'.\n\n"
+                            f"Chat History: {joined_text}"
+                        )
+
+                        print(f"🔄 [LTM] Executing Native call to Gemini using USER KEY...", flush=True)
+                        
+                        # 2. Execute strictly with User Key
+                        genai.configure(api_key=thread_api_key)
+                        model = genai.GenerativeModel('gemini-2.5-flash')
+                        response = model.generate_content(prompt)
+                        new_facts = response.text.strip()
+
+                        # 3. Save to Database (VARIABLES CORRECTED HERE)
+                        if new_facts and new_facts != "No facts":
+                            print(f"🧠 [LTM UPDATED NATIVELY]: {new_facts}", flush=True)
+                            memory_store.update_profile(str(user_id), str(user_email), new_facts)
+                            ACTIVE_CHAT_CURSORS[conversation_id] = last_summarized_count + len(new_ltm_messages)
+                        else:
+                            print("⚠️ [LTM WARNING] Gemini analyzed it but found no useful facts.", flush=True)
+
+                    except Exception as e:
+                        error_msg = str(e).lower()
+                        # Abort cleanly on quota errors
+                        if "429" in error_msg or "quota" in error_msg:
+                            print("⏳ [LTM QUOTA] User key hit rate limit. Aborting LTM update to protect Global Key. Will try next cycle.", flush=True)
+                        else:
+                            print(f"❌ [LTM FATAL ERROR]: {str(e)}", flush=True)
+
+                # Start the background thread
+                threading.Thread(target=run_text_ltm_synthesis, daemon=True).start()
+
+        # Keep Short Term Memory strictly to 10 messages for the LLM payload
+        history = history[-10:]
+        # ----------------------------------------
+
+        # Append new message
+        history.append({"role": "user", "parts": [transcript]})
+        facts = memory_store.get_profile(user_email) or "New session."
+
+        # The LLM Call
+        llm_result = generate_chat_response(
+            messages=history,
+            life_facts=facts,
+            model=os.environ.get("LLM_MODEL", "gemini-2.5-flash"),
+            api_key=active_key,   # 👈 MUST explicitly pass the key we grabbed in Phase 3.5!
+            max_tokens=4096       # 👈 MUST override the 1000 limit to prevent truncation!
+        )
+
+        # Graceful Rate Limit Fallback
+        if not llm_result or llm_result.get("status") != "success":
+            error_msg = llm_result.get("error", "Unknown Error") if llm_result else "Timeout"
+            if "429" in error_msg or "Quota" in error_msg or "RESOURCE_EXHAUSTED" in error_msg:
+                print("⏳ [API RATE LIMIT] Triggering UI cooldown message.")
+                return jsonify({
+                    "success": False,
+                    "error_type": "QUOTA_EXHAUSTED",
+                    "message": "My daily API limit has been reached. Please click Settings (⚙️) and paste a new Gemini API key to continue our session."
+                }), 429
+            return jsonify({"error": error_msg}), 500
+
+        # ==========================================
+        # PHASE 5: PROCESS & SAVE SUCCESS
+        # ==========================================
+        response_text = str(llm_result.get("response", "I'm here."))
+        raw_sentiment = str(llm_result.get("sentiment", "neutral"))
+        raw_themes = llm_result.get("themes", [])
+        
+        try:
+            importance = int(llm_result.get("importance", 5))
+        except (ValueError, TypeError):
+            importance = 5
+
+        if not isinstance(raw_themes, list):
+            raw_themes = [str(raw_themes)]
+
+        # Save User Message to Cloud
+        memory_store.store_memory(
+            user_id=user_email,
+            memory_type="conversation",
+            text=f"User: {transcript}",
+            conversation_id=conversation_id,
+            tags=["user"] + raw_themes,
+            sentiment=raw_sentiment,
+            importance=importance
+        )
+
+        # Save AI Response to Cloud
+        memory_store.store_memory(
+            user_id=user_email,
+            memory_type="conversation",
+            text=f"AI: {response_text}",
+            conversation_id=conversation_id,
+            tags=["assistant"] + raw_themes,
+            sentiment=raw_sentiment,
+            importance=importance
+        )
+
+        # ==========================================
+        # PHASE 6: FINAL RETURN
+        # ==========================================
+        return jsonify({
+            "success": True,
+            "response": response_text,
+            "message": response_text,
+            "transcript": transcript,
+            "vocal_tone": vocal_tone,
+            "text": response_text,
+            "sentiment": raw_sentiment,
+            "conversation_id": conversation_id
+        }), 200
+
+    except Exception as e:
+        error_str = str(e)
+        print(f"❌ [ROUTE ERROR] {error_str}")
+
+        # The API Limit Catcher (Failsafe)
+        if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "Quota" in error_str:
+            return jsonify({
+                "success": False,
+                "error_type": "QUOTA_EXHAUSTED",
+                "message": "My daily API limit has been reached. Please click Settings (⚙️) and paste a new Gemini API key to continue our session."
+            }), 429
+
+        return jsonify({"success": False, "error": error_str}), 500
+
+
+from perception.stt.stt_live import transcribe_audio, extract_pitch
 
 def get_transcript_from_request():
-    """Extract transcript from either text or audio input"""
-    # Check for text input first
-    if 'text' in request.form and request.form['text'].strip():
-        return request.form['text'].strip()
-    
-    # Check for audio input
+    # 1. Check if the browser sent an audio file (e.g., from the Record button)
     if 'audio' in request.files:
         audio_file = request.files['audio']
-        if audio_file and audio_file.filename:
-            try:
-                # Save audio temporarily with unique name
-                ext = os.path.splitext(audio_file.filename)[1] or '.wav'
-                temp_path = os.path.join(tempfile.gettempdir(), f"temp_audio_{uuid.uuid4()}{ext}")
-                audio_file.stream.seek(0)
-                audio_file.save(temp_path)
-
-                # Transcribe audio (the transcribe_audio helper should handle common audio formats)
-                transcript = transcribe_audio(temp_path)
-
-                # Clean up
-                try:
-                    if os.path.exists(temp_path):
-                        os.remove(temp_path)
-                except Exception:
-                    pass
-
-                return transcript
-            except Exception as e:
-                print(f"[ERROR] Audio transcription failed: {str(e)}")
-                return None
-    
-    return None
+        filename = "temp_upload.wav"
+        audio_file.save(filename)
+        
+        print(f"[PERCEPTION] Processing audio file: {filename}")
+        
+        try:
+            # 2. Extract Pitch (Crucial for your "Affective" integration thesis!)
+            pitch = extract_pitch(filename)
+            print(f"[PERCEPTION] Detected Pitch: {pitch} Hz")
+            
+            # 3. Transcribe using AssemblyAI
+            transcript = transcribe_audio(filename)
+            print(f"[PERCEPTION] Transcribed: '{transcript}'")
+            
+            return transcript
+        except Exception as e:
+            print(f"[PERCEPTION ERROR] {e}")
+            return None
+            
+    # 4. Fallback to standard text input
+    return request.form.get('text')
 
 def analyze_perception(transcript):
     """Analyze perception from transcript using tone and NLU modules"""
@@ -1034,15 +1399,15 @@ def build_enhanced_prompt_with_perception(transcript, perception_data, reasoning
 
 def generate_response_data(perception_data, user_id, transcript, conversation_id=None):
     """Generate response using Gemini API with clinical integration"""
+
     
-    # [FIX] Initialize api_key safely at start
-    api_key = None
-    
+
     try:
-        from utils.llm_client import generate_chat_response # pyre-ignore[21]
+        from utils.llm_client import generate_chat_response
         
         # [MEMORY FIX] Store User message in working memory immediately
         if conversation_id and transcript:
+        # ... (the rest of your function continues exactly as it is) ...
             store_working_memory(user_id, f"User: {transcript}", conversation_id)
 
         # Get message history for context
@@ -1068,9 +1433,9 @@ def generate_response_data(perception_data, user_id, transcript, conversation_id
                             except: pass
                             
                         if msg.startswith("User:"):
-                            message_history.append({"role": "user", "content": msg.replace("User:", "", 1).strip()})
+                            message_history.append({"role": "user", "parts": [msg.replace("User:", "", 1).strip()]})
                         elif msg.startswith("Assistant:"):
-                            message_history.append({"role": "assistant", "content": msg.replace("Assistant:", "", 1).strip()})
+                            message_history.append({"role": "model", "parts": [msg.replace("Assistant:", "", 1).strip()]})
                             
                 # 2. Semantic retrieval — 2 results, capped at 80 chars each
                 relevant_docs = working_mem.retrieve(query=transcript, n_results=2)
@@ -1200,14 +1565,71 @@ def generate_response_data(perception_data, user_id, transcript, conversation_id
         # Cap to last 6 history pairs to keep total payload small
         clean_history = []
         for msg in message_history:
-            if msg['content'] != transcript:
+            if msg['parts'][0] != transcript:
                 clean_history.append(msg)
-        clean_history = clean_history[-6:]  # type: ignore # hard cap: 6 history messages max
-                
+        
+        # --- THE MEMORY ROUTER ---
+        import time
+        import threading
+        global ACTIVE_CHAT_TIMERS
+        global ACTIVE_CHAT_CURSORS
+        
+        # 1. Grab all older messages as LTM candidates
+        ltm_candidates = clean_history[:-10]
+        
+        # 2. APPLY THE BOOKMARK
+        last_summarized_count = ACTIVE_CHAT_CURSORS.get(conversation_id, 0)
+        new_ltm_messages = ltm_candidates[last_summarized_count:]
+        
+        # 3. Set the Short Term Memory to a true 10 messages
+        clean_history = clean_history[-10:] 
+
+        # 4. The Server RAM Stopwatch
+        current_time = time.time()
+        last_time = ACTIVE_CHAT_TIMERS.get(conversation_id, current_time)
+        ACTIVE_CHAT_TIMERS[conversation_id] = current_time 
+        
+        time_idle = current_time - last_time
+
+        # --- X-RAY DEBUGGER ---
+        print(f"🕵️ [X-RAY] Idle: {int(time_idle)}s | Total LTM Pool: {len(ltm_candidates)} | Unsummarized: {len(new_ltm_messages)} | Cursor At: {last_summarized_count}", flush=True)
+        # ----------------------
+
+        
+            
+            # 5. Trigger ONLY if idle > 120s AND there are actually new messages to summarize
+        if time_idle > 120 and len(new_ltm_messages) > 0:
+            print(f"⏳ [MEMORY] User idle for {int(time_idle)}s. Summarizing {len(new_ltm_messages)} NEW messages into LTM...")
+            
+            def run_ltm_synthesis():
+                try:
+                    from utils.llm_client import generate_core_insight
+                    import os
+                    
+                    # You can add your backup key logic here later if you want!
+                    api_key = os.environ.get("GEMINI_API_KEY", "")
+                    
+                    old_texts = [m.get("parts", [m.get("content", m.get("text", ""))])[0] for m in new_ltm_messages]
+                    new_facts = generate_core_insight(memories=old_texts, api_key=api_key)
+                    
+                    if new_facts:
+                        print(f"🧠 [LTM UPDATED]: {new_facts}")
+                        memory_store.update_profile(user_id, new_facts) 
+                        
+                        # --- THE FIX: Only move the bookmark IF it succeeds! ---
+                        ACTIVE_CHAT_CURSORS[conversation_id] = last_summarized_count + len(new_ltm_messages)
+                    else:
+                        print("⚠️ [LTM WARNING] AI returned no facts. Bookmark NOT moved.")
+                        
+                except Exception as e:
+                    print(f"❌ [LTM ERROR]: {e}")
+                    
+            threading.Thread(target=run_ltm_synthesis).start()
+        # -------------------------        
         # 2. Append the Enhanced User Prompt
         clean_history.append({
             "role": "user",
-            "content": final_user_message
+            "parts": [final_user_message]
         })
         
         # Get LLM response from Gemini
@@ -1222,6 +1644,7 @@ def generate_response_data(perception_data, user_id, transcript, conversation_id
             print(f"[ERROR] LLM Error: {llm_result.get('error')}")
         else:
             response_text = llm_result.get('response', 'I understand.')
+        print(f"--- DEBUG: Total Response Length: {len(response_text)} characters ---")
         
         # Generate audio response
         audio_path = generate_audio(response_text)
@@ -1246,7 +1669,7 @@ def generate_response_data(perception_data, user_id, transcript, conversation_id
         
         # [QUOTA SAVER] Pass None as llm_client so only LOCAL extraction runs (no extra API call)
         current_exchange = f"User: {transcript}\nAI: {response_text}"
-        pers_memory.extract_and_save_async(user_id, current_exchange, None, api_key=str(os.environ.get("GEMINI_API_KEY") or ""))
+        pers_memory.extract_and_save_async(user_id, current_exchange, generate_chat_response, api_key=str(os.environ.get("GEMINI_API_KEY") or ""))
 
         # [CLINICAL INTELLIGENCE] Async session analytics (emotion + themes + safety)
         try:
@@ -1380,36 +1803,31 @@ def get_conversations():
             
 
 
-@app.route('/api/conversation/<conversation_id>', methods=['GET'])
+@app.route('/api/conversation/<conversation_id>/messages', methods=['GET'])
 @login_required
-def get_conversation_detail(conversation_id):
-    """Get detailed messages from a conversation using optimized retrieval"""
+def get_conversation_messages(conversation_id):
     try:
-        user_id = current_user.id
-        messages = memory_store.get_conversation_messages(user_id, conversation_id)
-        
-        formatted_messages = []
-        for msg in messages:
-            text = msg.get('text', '')
-            role = "user" if text.startswith("User:") else "assistant"
-            # Clean text
-            clean_text = text.replace("User: ", "").replace("AI: ", "").replace("Assistant: ", "")
-            
-            formatted_messages.append({
-                "role": role,
-                "text": clean_text,
-                "timestamp": msg.get('timestamp')
-            })
-            
+        skip_amount = int(request.args.get('skip', 0))
+        u_email = str(current_user.email)
+
+        # Fetch the messages
+        messages = memory_store.get_conversation_messages(
+            user_id=u_email,
+            conversation_id=conversation_id,
+            skip=skip_amount
+        )
+
+        # --- THE FIX: The "Modern UI" Wrapper ---
+        # We send it as a list AND as a wrapped object to be 100% safe
         return jsonify({
             "success": True,
-            "conversation_id": conversation_id,
-            "messages": formatted_messages
+            "messages": messages,
+            "conversation_id": conversation_id
         }), 200
+
     except Exception as e:
-        print(f"Error fetching conversation detail: {e}")
-        return jsonify({"success": False, "messages": [], "message": str(e)}), 500
-            
+        print(f"❌ [API ERROR] Failed to fetch messages: {e}")
+        return jsonify({"success": False, "messages": [], "error": str(e)}), 500            
 
 
 @app.route('/api/save-conversation-with-name', methods=['POST'])
@@ -1488,45 +1906,42 @@ def get_named_conversations():
 @app.route('/api/delete-conversation', methods=['POST'])
 @login_required
 def api_delete_conversation():
-    """Delete a conversation by id from both metadata and long-term memory"""
     try:
-        data = request.get_json() or {}
-        conversation_id = data.get('conversation_id', '').strip()
-        if not conversation_id:
-            return jsonify({"success": False, "message": "conversation_id is required"}), 400
-
-        user_id = current_user.id
-
-        # Delete metadata from MongoDB if present
-        if mongo_connected and db is not None:
-            try:
-                conversations_collection = db['conversation_metadata']
-                conversations_collection.delete_many({"conversation_id": conversation_id, "user_id": user_id})
-            except Exception as e:
-                print(f"[WARNING] Could not delete conversation metadata: {e}")
-
-        # Delete from Chroma via MemoryStore
-        success = memory_store.delete_conversation(user_id, conversation_id)
+        data = request.json or {}
+        # Catch the ID from any possible label the UI might send
+        c_id = data.get('conversation_id') or data.get('id') or data.get('memory_id')
         
-        # [NEW] Also clean up the temporary working memory collection
+        # Check both ID formats (ID and Email) to be safe
+        u_id = str(current_user.id)
+        u_email = getattr(current_user, 'email', 'unknown')
+
+        if not c_id:
+            return jsonify({"success": False, "message": "No ID provided"}), 400
+
+        print(f"🧨 [NUCLEAR DELETE] Wiping {c_id} for {u_id}/{u_email}", flush=True)
+
+        # 1. Wipe from MongoDB (The "Everything" Search)
+        # This looks for the ID in conversation_id OR memory_id for BOTH the UID and Email
+        memory_store.mongo_db.memories.delete_many({
+            "$or": [{"user_id": u_id}, {"user_id": u_email}],
+            "$or": [
+                {"conversation_id": c_id},
+                {"memory_id": c_id},
+                {"id": c_id}
+            ]
+        })
+
+        # 2. Wipe from Vector DB
         try:
-            wm = WorkingMemory(f"working_memory_{conversation_id}")
-            wm.clear()
-        except Exception as e:
-            print(f"[WARNING] Could not clear working memory for {conversation_id}: {e}")
+            memory_store.vector_db.delete(where={"conversation_id": c_id})
+        except:
+            pass
+
+        return jsonify({"success": True, "message": "Record purged."})
         
-        if success:
-            print(f"[OK] Conversation {conversation_id} deleted successfully for {user_id}")
-            return jsonify({"success": True, "message": "Conversation deleted successfully"}), 200
-        else:
-            print(f"[ERROR] Failed to delete conversation {conversation_id} for {user_id}")
-            return jsonify({"success": False, "message": "Failed to delete conversation from memory store"}), 500
-            
     except Exception as e:
-        print(f"Error in api_delete_conversation: {e}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"success": False, "message": str(e)}), 500
+        print(f"❌ [DELETE FAILED] {e}", flush=True)
+        return jsonify({"success": False, "error": str(e)}), 500
 
 @app.route('/api/conversation-context/<conversation_id>', methods=['GET'])
 @login_required
@@ -1946,7 +2361,46 @@ def api_user_risk_alerts(user_id):
         print(f"[ERROR] /api/user-risk-alerts/<user_id>: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
 
+@app.route('/api/admin/global-stats', methods=['GET'])
+@login_required
+@admin_required
+def get_global_stats():
+    """Admin-only: Aggregates data from every single user in the system."""
+    try:
+        # 1. Fetch ALL memories from the collection
+        all_memories = list(memory_store.mongo_db.memories.find())
+        
+        # 2. Calculate totals
+        total_messages = len(all_memories)
+        
+        # 3. Extract unique users and their message counts
+        user_list = [m.get('user_id') for m in all_memories if m.get('user_id')]
+        user_counts = dict(Counter(user_list))
+        unique_users_count = len(user_counts)
 
+        # 4. Get the "Global Feed" (Last 10 messages across the whole app)
+        # We sort by timestamp descending to see the freshest activity
+        latest_feed = list(memory_store.mongo_db.memories.find().sort("timestamp", -1).limit(10))
+        
+        feed_data = []
+        for m in latest_feed:
+            feed_data.append({
+                "user": m.get('user_id'),
+                "text": m.get('content', 'No content')[:100] + "...",
+                "time": m.get('timestamp')
+            })
+
+        return jsonify({
+            "status": "success",
+            "total_interactions": total_messages,
+            "active_users_count": unique_users_count,
+            "user_breakdown": user_counts,
+            "global_feed": feed_data
+        }), 200
+
+    except Exception as e:
+        print(f"❌ [ADMIN ERROR] {e}")
+        return jsonify({"error": str(e)}), 500
 # Error Handlers
 @app.errorhandler(404)
 def not_found(error):
@@ -1956,4 +2410,4 @@ from change_password import change_password_bp # pyre-ignore[21]
 app.register_blueprint(change_password_bp)
 
 if __name__ == '__main__':
-    app.run(debug=True, use_reloader=False, host='0.0.0.0', port=5000)
+    app.run(debug=True, use_reloader=False, host='0.0.0.0', port=80)

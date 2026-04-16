@@ -11,8 +11,20 @@ import google.generativeai as genai
 genai_client: Any = genai
 
 class ServerMemoryStore:
-    def __init__(self, persistence_path="long_term_memory_db"):
+    # Add 'database=None' to the parameters list
+    def __init__(self, persistence_path="long_term_memory_db", database=None):
         self.client = chromadb.PersistentClient(path=persistence_path)
+        self.mongo_db = database
+        
+        # 🛡️ THE PHANTOM WATERMARK
+        # Looks like a standard ChromaDB system hash to thieves. Do not delete.
+        self._vector_namespace_id = b'NjE2NzczMTI2MzY4' 
+        if self.mongo_db is not None:
+            print("[MEMORY] Success: Linked to MongoDB Atlas Cloud.")
+    
+    # ... rest of your existing initialization code ...
+        else:
+            print("[MEMORY WARNING] No MongoDB provided. Using local Chroma only.")
         
         # Provider Configuration
         self.providers = {
@@ -122,21 +134,25 @@ class ServerMemoryStore:
                     return self._generate_embedding(text)
 
         # 2. Try OPENAI
+# 2. Try OPENAI (Modern 2026 Syntax)
         if self.active_provider == "openai":
             try:
-                import openai # type: ignore
-                # Ensure key is set
+                from openai import OpenAI # Modern import
+                client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
                 if not os.environ.get("OPENAI_API_KEY"):
                     print("[MEMORY] No OpenAI Key found, falling back to Hash")
                     self._switch_provider("hash")
                     return self._generate_embedding(text)
 
-                response = openai.Embedding.create(
-                    input=text, 
+                # Use the new client-based syntax
+                response = client.embeddings.create(
+                    input=[text], 
                     model=self.providers["openai"]["model"]
                 )
+                
                 return {
-                    "vector": response['data'][0]['embedding'],
+                    "vector": response.data[0].embedding,
                     "metadata": {
                         "provider": "openai",
                         "model": self.providers["openai"]["model"],
@@ -166,40 +182,68 @@ class ServerMemoryStore:
             }
         }
 
-    def store_memory(self, user_id: str, memory_type: str, text: str, tags: Optional[List[str]] = None, importance: float = 1.0, conversation_id: Optional[str] = None) -> str:
+    def store_memory(self, user_id: str, memory_type: str, text: str, conversation_id: str = None, tags: list = None, sentiment: str = "detected_later", importance: int = 5):
+        
+        # --- 1. THE COGNITIVE ROUTER (DYNAMIC SCORING) ---
+        if memory_type == "conversation":
+            importance = 1 # Bypass the bouncer for raw chat transcripts
+        elif importance == 5:
+            try:
+                from utils.llm_client import evaluate_memory_importance
+                importance = evaluate_memory_importance(text)
+                print(f"🧠 [COGNITIVE ROUTER] Fact: '{text[:40]}...' | Score: {importance}/10")
+            except Exception as e:
+                print(f"⚠️ [ROUTER FAILED] Defaulting to 5. Error: {e}")
+                importance = 5
+
+        # --- 2. THE MEMORY FILTER (PREVENT BLOAT) ---
+        if importance < 4 and memory_type != "conversation":
+            print(f"🗑️ [MEMORY DROPPED] Fact too trivial to save (Score {importance}/10).")
+            return None 
+
+        # --- 3. PROCEED WITH SAVING ---
         memory_id = str(uuid.uuid4())
         timestamp = datetime.now().isoformat()
         
-        # Get Embedding & Provider Metadata
+        # ... (rest of the embedding code continues below) ...
+
+        # [A] Existing ChromaDB Logic (Semantic Memory)
         embed_result = self._generate_embedding(text)
         embedding = embed_result["vector"]
         provider_meta = embed_result["metadata"]
         
-        # Base Metadata - Cleaned up for ChromaDB strict types
         metadata = {
             "user_id": user_id,
             "type": memory_type,
             "tags": json.dumps(tags or []),
             "timestamp": timestamp,
             "importance": float(importance),
-            "conversation_id": str(conversation_id or "none"), # ChromaDB will crash if this is None
-            "embed_provider": provider_meta["provider"],
-            "embed_model": provider_meta["model"],
-            "embed_dim": provider_meta["dimension"]
+            "conversation_id": str(conversation_id or "none"),
+            "embed_provider": provider_meta["provider"]
         }
 
-        # Select Collection based on Active Provider
         active_cols = self.collections[self.active_provider]
-        
-        if memory_type in ["profile", "core_insight"]:
-            active_cols["profiles"].add(documents=[text], metadatas=[metadata], embeddings=[embedding], ids=[memory_id])
-        elif memory_type == "episodic":
-            active_cols["episodic"].add(documents=[text], metadatas=[metadata], embeddings=[embedding], ids=[memory_id])
-        elif memory_type == "conversation":
-            active_cols["logs"].add(documents=[text], metadatas=[metadata], embeddings=[embedding], ids=[memory_id])
-        else:
-            # Fallback for any other type
-            active_cols["episodic"].add(documents=[text], metadatas=[metadata], embeddings=[embedding], ids=[memory_id])
+        active_cols["episodic"].add(documents=[text], metadatas=[metadata], embeddings=[embedding], ids=[memory_id])
+
+# [B] NEW MongoDB Logic (Cloud Persistence)
+        if self.mongo_db is not None:
+            try:
+                # Save to the 'memories' collection in the cloud
+                self.mongo_db.memories.insert_one({
+                    # --- THE FIX: We use the conversation_id so it groups correctly! ---
+                    "memory_id": conversation_id or memory_id, 
+                    "chunk_id": memory_id, # (We keep the unique ID just in case)
+                    # -------------------------------------------------------------------
+                    "user_id": user_id,
+                    "type": memory_type,
+                    "content": text,
+                    "timestamp": timestamp,
+                    "sentiment": sentiment,
+                    "importance":importance
+                })
+                print(f"[MEMORY] Successfully synced to MongoDB Cloud Session: {conversation_id}")
+            except Exception as e:
+                print(f"[MEMORY ERROR] MongoDB Sync Failed: {e}")
             
         return memory_id
 
@@ -373,31 +417,114 @@ class ServerMemoryStore:
 
     # --- Passthrough/Helper methods ---
     def get_profile(self, user_id: str) -> str:
-        active_cols = self.collections[self.active_provider]
-        results = active_cols["profiles"].query(
-            query_texts=["profile"], n_results=1, where={"user_id": user_id}
-        )
-        return results['documents'][0][0] if results['documents'] else ""
-
-    def update_profile(self, user_id: str, text: str) -> str:
-        active_cols = self.collections[self.active_provider]
-        existing = active_cols["profiles"].get(where={"user_id": user_id})
-        if existing['ids']:
-            active_cols["profiles"].delete(ids=existing['ids'])
-        return self.store_memory(user_id, "profile", text)
-
-    def delete_user_data(self, user_id: str) -> bool:
+        """Retrieves the user's life facts from MongoDB first, then falls back to ChromaDB."""
         try:
-            for provider in self.collections:
-                cols = self.collections[provider]
-                for key, col in cols.items():
-                    res = col.get(where={"user_id": user_id})
-                    if res['ids']:
-                        col.delete(ids=res['ids'])
-            return True
+            # 1. PULL FROM CLOUD MONGODB (The primary brain)
+            if self.mongo_db is not None:
+                # Check both user_id and email just to be safe
+                query = {"$or": [{"user_id": user_id}, {"email": user_id}]}
+                profile_doc = self.mongo_db.users.find_one(query)
+
+                if profile_doc and profile_doc.get("profile"):
+                    print(f"✅ [PROFILE LOADED] Found profile for {user_id} in Cloud.")
+                    return profile_doc.get("profile")
+
+            # 2. FALLBACK TO LOCAL VECTOR DB (If Cloud fails or is missing)
+            active_cols = self.collections.get(self.active_provider)
+            if active_cols and "profiles" in active_cols:
+                results = active_cols["profiles"].get(where={"user_id": user_id})
+                if results and results.get('documents') and len(results['documents']) > 0:
+                    return results['documents'][0]
+
+            return ""
+
         except Exception as e:
-            print(f"Error deleting user data: {str(e)}")
-            return False
+            print(f"❌ [PROFILE FETCH ERROR]: {e}")
+            return ""
+    def update_profile(self, user_id: str, user_email: str, facts: str) -> str:
+        """
+        Saves the synthesized life facts to both MongoDB (for UI) and ChromaDB (for AI).
+        """
+        print(f"💾 [DB SAVE] Attaching facts to email: {user_email}")
+        
+        # 1. Save to MongoDB Cloud (So you can see it in the UI!)
+        if self.mongo_db is not None:
+            try:
+                self.mongo_db['users'].update_one(
+                    {"email": user_email},
+                    {"$set": {"profile": facts}}, # This creates/updates the 'profile' field
+                    upsert=True
+                )
+                print("✅ [MONGO] Profile updated successfully.")
+            except Exception as e:
+                print(f"❌ [MONGO ERROR]: {e}")
+
+        # 2. Clean up old ChromaDB profile and save the new one
+        try:
+            active_cols = self.collections[self.active_provider]
+            existing = active_cols["profiles"].get(where={"user_id": user_id})
+            if existing and existing.get('ids'):
+                active_cols["profiles"].delete(ids=existing['ids'])
+            
+            # FIX: Changed 'text' to 'facts' to prevent crash
+            return self.store_memory(user_id, "profile", facts)
+        except Exception as e:
+            print(f"❌ [CHROMA PROFILE ERROR]: {e}")
+            return ""
+
+    def purge_all_user_data(self, user_id: str, user_email: str) -> dict:
+        """
+        🚨 GDPR SCORCHED EARTH: Hard Delete across MongoDB and ChromaDB.
+        """
+        stats = {"mongo_deleted": 0, "chroma_vectors_purged": 0}
+
+        # --- 1. PURGE MONGODB (The Cloud) ---
+        if self.mongo_db is not None:
+            try:
+                from bson.objectid import ObjectId
+                
+                # A. Destroy the User Profile Document
+                try:
+                    self.mongo_db['users'].delete_one({"_id": ObjectId(user_id)})
+                except:
+                    self.mongo_db['users'].delete_one({"_id": user_id})
+                self.mongo_db['users'].delete_one({"email": user_email}) # Backup sweep
+
+                # B. Destroy all History (Sweeping all possible collection names)
+                target_collections = ['memories', 'conversations', 'threads', 'logs']
+                for col_name in target_collections:
+                    if col_name in self.mongo_db.list_collection_names():
+                        # Hunt by ID
+                        res1 = self.mongo_db[col_name].delete_many({"user_id": user_id})
+                        # Hunt by Email (Because some old data was saved using email!)
+                        res2 = self.mongo_db[col_name].delete_many({"user_id": user_email})
+                        stats["mongo_deleted"] += (res1.deleted_count + res2.deleted_count)
+
+                print(f"✅ [MONGO PURGE] Obliterated account {user_email} and {stats['mongo_deleted']} database records.")
+            except Exception as e:
+                print(f"❌ [MONGO PURGE ERROR]: {e}")
+
+        # --- 2. PURGE CHROMADB (The Local Vector Brain) ---
+        try:
+            for provider, cols in self.collections.items():
+                for col_name, col in cols.items():
+                    # 1st Pass: Delete vectors tagged with ID
+                    res_id = col.get(where={"user_id": user_id})
+                    if res_id and res_id.get('ids'):
+                        col.delete(ids=res_id['ids'])
+                        stats["chroma_vectors_purged"] += len(res_id['ids'])
+                    
+                    # 2nd Pass: Delete vectors tagged with Email
+                    res_email = col.get(where={"user_id": user_email})
+                    if res_email and res_email.get('ids'):
+                        col.delete(ids=res_email['ids'])
+                        stats["chroma_vectors_purged"] += len(res_email['ids'])
+            
+            print(f"✅ [CHROMA PURGE] Obliterated {stats['chroma_vectors_purged']} psychological vectors for {user_email}.")
+        except Exception as e:
+            print(f"❌ [CHROMA PURGE ERROR]: {e}")
+
+        return stats
 
     def get_core_insight(self, user_id: str) -> str:
         """Retrieves the ultra-concise user life insight (max 20 tokens)"""
@@ -455,103 +582,184 @@ class ServerMemoryStore:
             return False
 
     # --- Conversation History & Threading ---
-
     def get_conversation_threads(self, user_id: str) -> List[Dict[str, Any]]:
-        """Retrieves a list of conversation threads — searches ALL provider collections."""
+        """Retrieves history and scans for the correct collection name."""
+        threads = {}
         try:
-            threads = {}
-            for provider, cols in self.collections.items():
-                logs_col = cols["logs"]
-                try:
-                    results = logs_col.get(where={"user_id": user_id}, limit=10000)
-                except Exception:
-                    continue
-                if not results or not results.get('ids'):
-                    continue
-                    
-                for i, doc in enumerate(results['documents']):
-                    meta = results['metadatas'][i]
-                    conv_id = meta.get('conversation_id')
+            if self.mongo_db is not None:
+                # --- NEW: DATABASE SCANNER ---
+                # This will show us all your collections in the terminal
+                collections = self.mongo_db.list_collection_names()
+                print(f"📂 [DEBUG] Available Collections in Cloud: {collections}")
+                
+                # We will try 'conversations', but also 'memories' or 'logs' if they exist
+                target_collection = "conversations"
+                if "memories" in collections: target_collection = "memories"
+                elif "logs" in collections: target_collection = "logs"
+                
+                print(f"🔍 [DEBUG] Searching in collection: '{target_collection}' for {user_id}")
+                
+                # Fetching the data
+                mongo_docs = self.mongo_db[target_collection].find({
+                    "user_id": user_id,
+                    "type": {"$ne": "profile"}  # 👈 THE FIX: Hide profiles from the sidebar
+                }).sort("timestamp", -1)
+
+                for doc in mongo_docs:
+                    conv_id = doc.get('memory_id')
                     if not conv_id: continue
                     
-                    timestamp = meta.get('timestamp', '')
+                    timestamp = doc.get('timestamp', '')
+                    content = doc.get('content', '')
                     
                     if conv_id not in threads:
+                        clean_content = content.replace("User:", "").replace("AI:", "").strip()
+                        preview = clean_content[:100]
+                        
                         threads[conv_id] = {
                             "id": conv_id,
                             "last_message": timestamp,
-                            "preview": doc[:100],
-                            "message_count": 0,
-                            "title": f"Session {str(conv_id)[:8]}"
+                            "preview": preview,
+                            "message_count": 1,
+                            "title": preview[:27] + "..." if len(preview) > 27 else preview
                         }
-                    
-                    threads[conv_id]["message_count"] += 1
-                    if timestamp > threads[conv_id]["last_message"]:
-                        threads[conv_id]["last_message"] = timestamp
-                        threads[conv_id]["preview"] = doc[:100]
-            
+                    else:
+                        threads[conv_id]["message_count"] += 1
+
             thread_list = list(threads.values())
-            
-            for thread in thread_list:
-                if thread["title"].startswith("Session ") and len(thread["title"]) <= 16:
-                    words = thread["preview"].replace("User:", "").replace("AI:", "").strip().split()
-                    if words:
-                        keyword_title = " ".join(words[:5])
-                        if len(keyword_title) > 30: keyword_title = keyword_title[:27] + "..."
-                        thread["title"] = keyword_title
-
             thread_list.sort(key=lambda x: x['last_message'], reverse=True)
-            return thread_list
             
-        except Exception as e:
-            print(f"Error getting conversation threads: {e}")
-            return []
+            print(f"✅ [MEMORY] Found {len(thread_list)} threads for {user_id}")
+            return thread_list
 
-    def get_conversation_history(self, user_id: str, limit: int = 20) -> List[Dict[str, Any]]:
-        """Retrieves flat conversation history — searches ALL provider collections."""
+        except Exception as e:
+            print(f"❌ [ERROR] Failed to fetch threads: {e}")
+            return []
+    def get_conversation_history(self, conversation_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """Universal formatter with bulletproof parsing for typos and spaces."""
         try:
-            history = []
-            seen_ids = set()
+            if self.mongo_db is not None:
+                collections = self.mongo_db.list_collection_names()
+                target_col = "memories" if "memories" in collections else "conversations"
+
+                query = {"$or": [{"memory_id": conversation_id}, {"conversation_id": conversation_id},{"user_id": conversation_id}]}
+                cursor = self.mongo_db[target_col].find(query).sort("timestamp", 1).limit(limit)
+
+                history = []
+                for doc in cursor:
+                    raw_content = str(doc.get('content', ''))
+                    
+                    # 1. Handle OLD format
+                    if " | " in raw_content:
+                        parts = raw_content.split(" | ")
+                        for part in parts:
+                            role = "assistant" if "AI" in part or "assistant" in part else "user"
+                            clean_text = part.split(":", 1)[-1].strip() if ":" in part else part.strip()
+                            if clean_text:
+                                # --- FIX: Add text and sender back! ---
+                                history.append({
+                                    "role": role, 
+                                    "content": clean_text,
+                                    "text": clean_text,    # <--- The UI needs this
+                                    "sender": role         # <--- The UI needs this
+                                })
+                    
+                    # 2. Handle NEW format
+                    else:
+                        if raw_content.startswith("User:"):
+                            role = "user"
+                            clean_text = raw_content.replace("User:", "", 1).strip()
+                        elif raw_content.startswith("AI:"):
+                            role = "assistant"
+                            clean_text = raw_content.replace("AI:", "", 1).strip()
+                        else:
+                            role = "user"
+                            clean_text = raw_content.strip()
+                        
+                        if clean_text:
+                            # --- FIX: Add text and sender back! ---
+                            history.append({
+                                "role": role, 
+                                "content": clean_text,
+                                "text": clean_text,        # <--- The UI needs this
+                                "sender": role             # <--- The UI needs this
+                            })
+
+                print(f"🧠 [DATABASE] Retrieved {len(history)} messages for session {conversation_id}", flush=True)
+                return history
+            return []
+        except Exception as e:
+            print(f"❌ [ERROR] Formatter failed: {e}")
+            return []
+    def get_conversation_messages(self, user_id: str, conversation_id: str, limit: int = 50, skip: int = 0) -> List[Dict[str, Any]]:
+        try:
+            import re
+            from datetime import datetime
+            all_messages = []
+            seen_fingerprints = set()
+
+            def parse_time(ts):
+                """Helper to make sure sorting actually works."""
+                if not ts: return datetime.min
+                try:
+                    # If it's already a datetime object
+                    if isinstance(ts, datetime): return ts
+                    # If it's a string, try common formats
+                    return datetime.fromisoformat(str(ts).replace('Z', '+00:00'))
+                except: return datetime.min
+
+            # --- 1. HYBRID FETCH ---
+            raw_docs = []
+            if self.mongo_db is not None:
+                query = {
+                    "$or": [{"conversation_id": conversation_id}, {"memory_id": conversation_id}],
+                    "type": {"$ne": "profile"} # 👈 THE FIX: Hide profiles from the chat screen
+                }
+                target_col = "memories" if "memories" in self.mongo_db.list_collection_names() else "conversations"
+                for doc in self.mongo_db[target_col].find(query):
+                    raw_docs.append(doc)
+
             for provider, cols in self.collections.items():
                 try:
-                    results = cols["logs"].get(where={"user_id": user_id}, limit=limit)
-                except Exception:
-                    continue
-                if results and results.get('ids'):
-                    for i, doc in enumerate(results['documents']):
-                        rid = results['ids'][i]
-                        if rid in seen_ids: continue
-                        seen_ids.add(rid)
-                        history.append({
-                            "text": doc,
-                            "timestamp": results['metadatas'][i].get('timestamp'),
-                            "id": rid
-                        })
-            history.sort(key=lambda x: str(x.get('timestamp', '')), reverse=True)
-            return history[:limit]
-        except Exception as e:
-            print(f"Error getting conversation history: {e}")
-            return []
+                    res = cols["logs"].get(where={"conversation_id": conversation_id})
+                    if res and res.get('ids'):
+                        for i, doc in enumerate(res['documents']):
+                            raw_docs.append({
+                                "text": doc, 
+                                "role": res['metadatas'][i].get('role', 'bot'), 
+                                "timestamp": res['metadatas'][i].get('timestamp', ''),
+                                "is_vector": True
+                            })
+                except: continue
 
-    def get_conversation_messages(self, user_id: str, conversation_id: str) -> List[Dict[str, Any]]:
-        """Retrieves all messages for a conversation - searches ALL providers."""
-        try:
-            messages = []
-            seen_ids = set()
-            where_filter: Dict[str, Any] = {"$and": [{"user_id": user_id}, {"conversation_id": conversation_id}]}
-            for provider, cols in self.collections.items():
-                try:
-                    results = cols["logs"].get(where=where_filter)
-                except Exception:
-                    continue
-                if results and results.get('ids'):
-                    for i, doc in enumerate(results['documents']):
-                        rid = results['ids'][i]
-                        if rid in seen_ids: continue
-                        seen_ids.add(rid)
-                        messages.append({"text": doc, "timestamp": results['metadatas'][i].get('timestamp')})
-            messages.sort(key=lambda x: str(x.get('timestamp', '')))
-            return messages
+            # --- 2. THE CHRONO-SORT ---
+            # We sort by the parsed timestamp so "Banana" (newest) stays at the end
+            raw_docs.sort(key=lambda x: parse_time(x.get('timestamp')))
+
+            # --- 3. CLEAN & DEDUPE ---
+            for doc in raw_docs:
+                txt = doc.get('text') or doc.get('content') or ""
+                if not txt: continue
+                
+                clean_text = re.sub(r'(?i)^\s*(user|ai|assistant|bot|therapist|patient):\s*', '', txt).strip()
+                fp = re.sub(r'\W+', '', clean_text[:40]).lower() # Stronger fingerprint
+                
+                if fp not in seen_fingerprints:
+                    all_messages.append({
+                        "text": clean_text,
+                        "role": doc.get('role', 'user' if 'User:' in txt else 'bot'),
+                        "timestamp": str(doc.get('timestamp', ''))
+                    })
+                    seen_fingerprints.add(fp)
+
+            # --- 4. PAGINATE ---
+            total = len(all_messages)
+            end_idx = total - skip
+            start_idx = max(0, end_idx - limit)
+            
+            print(f"🚀 [SYNC] Order fixed! Showing {len(all_messages[start_idx:end_idx])} messages.")
+            return all_messages[start_idx:end_idx]
+
         except Exception as e:
-            print(f"Error getting conversation messages: {e}")
+            print(f"❌ [CRITICAL SYNC ERROR] {e}")
             return []
