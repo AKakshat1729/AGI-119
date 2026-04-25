@@ -112,4 +112,3 @@ AI Solutions Architect | B.Tech Computer Science (CCAI - IBM)
 * Native voice synthesis (TTS) for AI responses.
 
 ```
-
